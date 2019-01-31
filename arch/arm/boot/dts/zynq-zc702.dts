@@ -12,6 +12,7 @@
 
 	aliases {
 		ethernet0 = &gem0;
+		ethernet1 = &gem1;
 		i2c0 = &i2c0;
 		serial0 = &uart1;
 		mmc0 = &sdhci0;
@@ -82,12 +83,23 @@
 &gem0 {
 	status = "okay";
 	phy-mode = "rgmii-id";
-	phy-handle = <&ethernet_phy>;
+	phy-handle = <&ethernet_phy0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gem0_default>;
 
-	ethernet_phy: ethernet-phy@7 {
-		reg = <7>;
+	ethernet_phy0: ethernet-phy@23 {
+		reg = <23>;
+		device_type = "ethernet-phy";
+	};
+};
+
+&gem1 {
+	status = "okay";
+	phy-mode = "rgmii-id";
+	phy-handle = <&ethernet_phy1>;
+
+	ethernet_phy1: ethernet-phy@23 {
+		reg = <23>;
 		device_type = "ethernet-phy";
 	};
 };
