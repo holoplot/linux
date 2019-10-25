@@ -4719,9 +4719,12 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	int port;
 	int err;
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
+
 	if (!np && !pdata)
 		return -EINVAL;
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 	if (np)
 		compat_info = of_device_get_match_data(dev);
 
@@ -4741,9 +4744,11 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 		}
 	}
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 	if (!compat_info)
 		return -EINVAL;
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 	chip = mv88e6xxx_alloc_chip(dev);
 	if (!chip) {
 		err = -ENOMEM;
@@ -4752,9 +4757,11 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 
 	chip->info = compat_info;
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 	err = mv88e6xxx_smi_init(chip, mdiodev->bus, mdiodev->addr);
 	if (err)
 		goto out;
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 
 	chip->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(chip->reset)) {
@@ -4764,9 +4771,11 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	if (chip->reset)
 		usleep_range(1000, 2000);
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 	err = mv88e6xxx_detect(chip);
 	if (err)
 		goto out;
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 
 	mv88e6xxx_phy_init(chip);
 
@@ -4831,6 +4840,7 @@ static int mv88e6xxx_probe(struct mdio_device *mdiodev)
 	if (err)
 		goto out_mdio;
 
+printk(KERN_ERR ">>>> %s() :%d\n", __func__, __LINE__);
 	return 0;
 
 out_mdio:
