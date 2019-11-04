@@ -364,6 +364,15 @@ config I2C_POWERMAC
 
 comment "I2C system bus drivers (mostly embedded / system-on-chip)"
 
+config I2C_AD242X
+	tristate "Analog Devices AD242x"
+	depends on MFD_AD242X_CORE
+	help
+	  If you say yes to this option, ...
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ad242x.
+
 config I2C_ALTERA
 	tristate "Altera Soft IP I2C"
 	depends on (ARCH_SOCFPGA || NIOS2) && OF
