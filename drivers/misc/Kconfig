@@ -5,6 +5,9 @@
 
 menu "Misc devices"
 
+config DUMMY_CLK_CONSUMER
+	tristate "Dummy clock consumer"
+
 config SENSORS_LIS3LV02D
 	tristate
 	depends on INPUT
