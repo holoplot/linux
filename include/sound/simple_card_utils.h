@@ -66,6 +66,7 @@ struct asoc_simple_priv {
 		struct snd_soc_codec_conf *codec_conf;
 		struct snd_soc_pcm_stream *c2c_conf;
 		struct prop_nums num;
+		struct snd_soc_pcm_stream c2c_params;
 		unsigned int mclk_fs;
 	} *dai_props;
 	struct asoc_simple_jack hp_jack;
@@ -179,7 +180,10 @@ void asoc_simple_convert_fixup(struct asoc_simple_data *data,
 				      struct snd_pcm_hw_params *params);
 void asoc_simple_parse_convert(struct device_node *np, char *prefix,
 			       struct asoc_simple_data *data);
-
+void asoc_simple_parse_c2c_params(struct device *dev,
+				  struct device_node *np,
+				  char *prefix,
+				  struct snd_soc_pcm_stream *dest);
 int asoc_simple_parse_routing(struct snd_soc_card *card,
 				      char *prefix);
 int asoc_simple_parse_widgets(struct snd_soc_card *card,
