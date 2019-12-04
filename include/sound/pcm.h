@@ -1391,6 +1391,7 @@ static inline void snd_pcm_limit_isa_dma_size(int dma, size_t *max)
 					 (IEC958_AES3_CON_FS_48000<<24))
 
 const char *snd_pcm_format_name(snd_pcm_format_t format);
+int snd_pcm_format_by_name(const char *name, snd_pcm_format_t *format);
 
 /**
  * snd_pcm_stream_str - Get a string naming the direction of a stream
