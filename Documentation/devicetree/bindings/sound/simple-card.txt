@@ -27,6 +27,16 @@ Optional properties:
 - simple-audio-card,pin-switches	: List of strings containing the widget names for
 					  which pin switches must be created.
 
+Optional dai-link properies for CODEC-to-CODEC links:
+
+- codec-to-codec-format			: Format to configure
+					  "s16_le"; "s24_le", "s32_le", ...
+- codec-to-codec-rate			: Sample rate to configure
+- codec-to-codec-channels		: Number of channels to configure
+
+Note that for a CODEC-to-CODEC link to be activated, you also need to provide a
+valid DAPM path that connects the two components.
+
 Optional subnodes:
 
 - simple-audio-card,dai-link		: Container for dai-link level
