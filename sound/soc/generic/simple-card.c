@@ -92,6 +92,21 @@ static void simple_parse_convert(struct device *dev,
 	of_node_put(node);
 }
 
+static void simple_parse_c2c_params(struct device *dev,
+				    struct device_node *np,
+				    struct snd_soc_pcm_stream *dest)
+{
+	struct device_node *top = dev->of_node;
+	struct device_node *node = of_get_parent(np);
+
+	asoc_simple_parse_c2c_params(dev, top,  PREFIX, dest);
+	asoc_simple_parse_c2c_params(dev, node, PREFIX, dest);
+	asoc_simple_parse_c2c_params(dev, node, NULL,   dest);
+	asoc_simple_parse_c2c_params(dev, np,   NULL,   dest);
+
+	of_node_put(node);
+}
+
 static void simple_parse_mclk_fs(struct device_node *top,
 				 struct device_node *cpu,
 				 struct device_node *codec,
@@ -331,6 +346,10 @@ static int simple_dai_link_of(struct asoc_simple_priv *priv,
 
 	dai_link->ops = &simple_ops;
 	dai_link->init = asoc_simple_dai_init;
+
+	simple_parse_c2c_params(dev, node, &dai_props->c2c_params);
+	if (dai_props->c2c_params.formats != 0)
+		dai_link->params = &dai_props->c2c_params;
 
 	asoc_simple_canonicalize_cpu(dai_link, single_cpu);
 	asoc_simple_canonicalize_platform(dai_link);
