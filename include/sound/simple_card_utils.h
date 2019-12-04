@@ -62,6 +62,7 @@ struct simple_util_priv {
 		struct simple_util_data adata;
 		struct snd_soc_codec_conf *codec_conf;
 		struct prop_nums num;
+		struct snd_soc_pcm_stream c2c_params;
 		unsigned int mclk_fs;
 	} *dai_props;
 	struct simple_util_jack hp_jack;
@@ -189,6 +190,11 @@ int simple_util_parse_widgets(struct snd_soc_card *card,
 				      char *prefix);
 int simple_util_parse_pin_switches(struct snd_soc_card *card,
 				   char *prefix);
+
+void asoc_simple_parse_c2c_params(struct device *dev,
+				  struct device_node *np,
+				  char *prefix,
+				  struct snd_soc_pcm_stream *dest);
 
 int simple_util_init_jack(struct snd_soc_card *card,
 			       struct simple_util_jack *sjack,
