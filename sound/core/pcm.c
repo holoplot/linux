@@ -225,6 +225,29 @@ const char *snd_pcm_format_name(snd_pcm_format_t format)
 }
 EXPORT_SYMBOL_GPL(snd_pcm_format_name);
 
+/**
+ * snd_pcm_format_by_name - Return the PCM format code for the given name
+ * @name: PCM format name ('S16_LE', 'S24_3LE', ...)
+ * @format: Pointer to returned PCM format code
+ *
+ * The string comparison is done in a case-insensitive way.
+ *
+ * Return: 0 on success, or -ENOENT if the given format is not valid.
+ */
+int snd_pcm_format_by_name(const char *name, snd_pcm_format_t *format)
+{
+	snd_pcm_format_t i;
+
+	for (i = 0; i < ARRAY_SIZE(snd_pcm_format_names); i++)
+		if (strcasecmp(name, snd_pcm_format_names[i]) == 0) {
+			*format = i;
+			return 0;
+		}
+
+	return -ENOENT;
+}
+EXPORT_SYMBOL_GPL(snd_pcm_format_by_name);
+
 #ifdef CONFIG_SND_VERBOSE_PROCFS
 
 #define STATE(v) [SNDRV_PCM_STATE_##v] = #v
