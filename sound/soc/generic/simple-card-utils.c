@@ -52,6 +52,40 @@ void asoc_simple_parse_convert(struct device_node *np,
 }
 EXPORT_SYMBOL_GPL(asoc_simple_parse_convert);
 
+void asoc_simple_parse_c2c_params(struct device *dev,
+				  struct device_node *np,
+				  char *prefix,
+				  struct snd_soc_pcm_stream *dest)
+{
+	unsigned int rate, channels;
+	const char *format_string;
+	snd_pcm_format_t format;
+	char prop[128];
+	int ret;
+
+	if (!prefix)
+		prefix = "";
+
+	snprintf(prop, sizeof(prop), "%s%s", prefix, "codec-to-codec-rate");
+	of_property_read_u32(np, prop, &rate);
+
+	snprintf(prop, sizeof(prop), "%s%s", prefix, "codec-to-codec-channels");
+	of_property_read_u32(np, prop, &channels);
+
+	snprintf(prop, sizeof(prop), "%s%s", prefix, "codec-to-codec-format");
+	if (!of_property_read_string(np, prop, &format_string)) {
+		ret = snd_pcm_format_by_name(format_string, &format);
+		if (ret == 0) {
+			dest->formats = 1ULL << format;
+			dest->channels_min = dest->channels_max = channels;
+			dest->rate_min = dest->rate_max = rate;
+		} else {
+			dev_err(dev, "unknown dai format %s\n", format_string);
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(asoc_simple_parse_c2c_params);
+
 int asoc_simple_parse_daifmt(struct device *dev,
 			     struct device_node *node,
 			     struct device_node *codec,
