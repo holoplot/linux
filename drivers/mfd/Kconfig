@@ -99,6 +99,17 @@ config PMIC_ADP5520
 	  individual components like LCD backlight, LEDs, GPIOs and Kepad
 	  under the corresponding menus.
 
+config MFD_AD242X
+	bool "Analog Devices AD242x A2B support"
+	select MFD_CORE
+	select REGMAP_I2C
+	depends on I2C=y && OF
+	help
+	  If you say yes here, you get support for devices from the AD242x
+	  familiy. This driver provides common support for accessing the
+	  devices, additional drivers must be enabled in order to use the
+	  functionality of the devices.
+
 config MFD_AAT2870_CORE
 	bool "AnalogicTech AAT2870"
 	select MFD_CORE
