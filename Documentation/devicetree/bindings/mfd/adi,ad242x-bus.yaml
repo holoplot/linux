@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/mfd/adi,ad242x-bus.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Analog Devices AD242x A²B bus node
+
+maintainers:
+  - Daniel Mack <daniel@zonque.org>
+
+description: |
+  AD242x slave nodes represent the secondary I²C address a master node
+  transceiver exposes on the bus.
+
+properties:
+  compatible:
+    enum:
+      - adi,ad2428w-bus
+
+  reg:
+    maxItems: 1
+    description: |
+      The secondary I²C address of the master node
+      (called 'BUS' in the datasheet)
+
+required:
+  - compatible
+  - reg
