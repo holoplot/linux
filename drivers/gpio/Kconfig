@@ -1013,6 +1013,12 @@ endmenu
 menu "I2C GPIO expanders"
 	depends on I2C
 
+config GPIO_AD242X
+	tristate "AD242x A2B GPIO controller"
+	depends on AD2428
+	help
+	  This option enables support for GPIOs on AD242x A2B nodes.
+
 config GPIO_ADNP
 	tristate "Avionic Design N-bit GPIO expander"
 	depends on OF_GPIO
