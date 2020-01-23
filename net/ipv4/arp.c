@@ -304,6 +304,9 @@ static void arp_send_dst(int type, int ptype, __be32 dest_ip,
 {
 	struct sk_buff *skb;
 
+	printk("%s: #### dest_ip=%08X src_ip=%08X\n", __func__, dest_ip, src_ip);
+
+
 	/* arp on this interface. */
 	if (dev->flags & IFF_NOARP)
 		return;
@@ -394,6 +397,8 @@ static int arp_ignore(struct in_device *in_dev, __be32 sip, __be32 tip)
 {
 	struct net *net = dev_net(in_dev->dev);
 	int scope;
+
+	printk("%s: ####\n", __func__);
 
 	switch (IN_DEV_ARP_IGNORE(in_dev)) {
 	case 0:	/* Reply, the tip is already validated */
@@ -687,6 +692,9 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 	struct neighbour *n;
 	struct dst_entry *reply_dst = NULL;
 	bool is_garp = false;
+
+	printk("%s: ####\n", __func__);
+
 
 	/* arp_rcv below verifies the ARP header and verifies the device
 	 * is ARP'able.
