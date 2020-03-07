@@ -3347,7 +3347,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
 	 * state to any particular values on physical ports, but force the CPU
 	 * port and all DSA ports to their maximum bandwidth and full duplex.
 	 */
-	if (dsa_is_cpu_port(ds, port) || dsa_is_dsa_port(ds, port)) {
+	if (dsa_is_dsa_port(ds, port)) {
 		struct phylink_config pl_config = {};
 		unsigned long caps;
 
