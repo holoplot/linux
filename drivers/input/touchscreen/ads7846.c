@@ -611,7 +611,7 @@ static int get_pendown_state(struct ads7846 *ts)
 	if (ts->get_pendown_state)
 		return ts->get_pendown_state();
 
-	return !gpio_get_value(ts->gpio_pendown);
+	return gpio_get_value(ts->gpio_pendown);
 }
 
 static void null_wait_for_sync(void)
