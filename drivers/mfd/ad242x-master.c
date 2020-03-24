@@ -20,6 +20,8 @@ struct ad242x_master {
 	struct completion	run_completion;
 	struct completion	discover_completion;
 	struct ad242x_i2c_bus	bus;
+	struct irq_domain	*irq_domain;
+	unsigned int		irq_mask;
 	unsigned int		up_slot_size;
 	unsigned int		dn_slot_size;
 	bool			up_slot_alt_fmt;
@@ -27,6 +29,7 @@ struct ad242x_master {
 	unsigned int		sync_clk_rate;
 	int			irq;
 	u8			response_cycles;
+	u8			node_inttype[17];
 };
 
 struct ad242x_node *ad242x_master_get_node(struct ad242x_master *master)
@@ -53,61 +56,53 @@ unsigned int ad242x_master_get_clk_rate(struct ad242x_master *master)
 }
 EXPORT_SYMBOL_GPL(ad242x_master_get_clk_rate);
 
+u8 ad242x_node_inttype(struct ad242x_node *node)
+{
+	struct ad242x_master *master = node->master;
+
+	if (WARN_ON(node->id >= ARRAY_SIZE(master->node_inttype)))
+		return 0;
+
+	return master->node_inttype[node->id];
+}
+EXPORT_SYMBOL_GPL(ad242x_node_inttype);
+
+static void ad242x_handle_node_irq(struct ad242x_master *master, u8 node_id)
+{
+	int virq;
+
+	if (master->irq_mask & BIT(node_id))
+		return;
+
+	virq = irq_find_mapping(master->irq_domain, node_id);
+	handle_nested_irq(virq);
+}
+
 static int ad242x_read_one_irq(struct ad242x_master *master)
 {
 	struct regmap *regmap = master->node.regmap;
 	struct device *dev = master->node.dev;
-	unsigned int val, inttype;
+	unsigned int val, intsrc, inttype;
+	u8 node_id;
 	int ret;
 
-	ret = regmap_read(regmap, AD242X_INTSTAT, &val);
-	if (ret < 0) {
-		dev_err(dev, "unable to read INTSTAT register: %d\n", ret);
+	ret = regmap_read(regmap, AD242X_INTSRC, &intsrc);
+	if (ret < 0)
 		return ret;
-	}
 
-	if (!(val & AD242X_INTSTAT_IRQ))
+	dev_err(dev, "%s() intsrc %02x\n", __func__, intsrc);
+
+	if (intsrc == 0)
 		return -ENOENT;
 
+	if (intsrc & AD242X_INTSRC_SLVINT)
+		node_id = intsrc & 0xf;
+	else
+		node_id = 16;
+
 	ret = regmap_read(regmap, AD242X_INTTYPE, &inttype);
-	if (ret < 0) {
-		dev_err(dev, "unable to read INTTYPE register: %d\n", ret);
-		return ret;
-	}
-
-	ret = regmap_read(regmap, AD242X_INTSRC, &val);
-	if (ret < 0) {
-		dev_err(dev, "unable to read INTSRC register: %d\n", ret);
-		return ret;
-	}
-
-	ret = regmap_read(regmap, AD242X_INTPND0, &val);
 	if (ret < 0)
 		return ret;
-
-	ret = regmap_write(regmap, AD242X_INTPND0, val);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_read(regmap, AD242X_INTPND1, &val);
-	if (ret < 0)
-		return ret;
-
-	ret = regmap_write(regmap, AD242X_INTPND1, val);
-	if (ret < 0)
-		return ret;
-
-	if (val & AD242X_INTSRC_MSTINT) {
-		ret = regmap_read(regmap, AD242X_INTPND2, &val);
-		if (ret < 0)
-			return ret;
-
-		ret = regmap_write(regmap, AD242X_INTPND2, val);
-		if (ret < 0)
-			return ret;
-	}
-
-	dev_err(dev, "%s() inttype: 0x%02x\n", __func__, inttype);
 
 	switch (inttype) {
 	case AD242X_INTTYPE_DSCDONE:
@@ -117,8 +112,27 @@ static int ad242x_read_one_irq(struct ad242x_master *master)
 		complete(&master->run_completion);
 		break;
 	default:
-		dev_info(dev, "Unhandled interrupt type 0x%02x\n", inttype);
-	}
+		master->node_inttype[node_id] = inttype;
+		ad242x_handle_node_irq(master, node_id);
+		}
+
+	/* Clear pending IRQs */
+
+	ret = regmap_read(regmap, AD242X_INTPND0, &val);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(regmap, AD242X_INTPND0, val);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_read(regmap, AD242X_INTPND2, &val);
+	if (ret < 0)
+		return ret;
+
+	ret = regmap_write(regmap, AD242X_INTPND2, val);
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
@@ -139,13 +153,11 @@ static int ad242x_read_irqs(struct ad242x_master *master)
 	}
 }
 
-static irqreturn_t ad242x_handle_irq(int irq, void *devid)
+static irqreturn_t ad242x_handle_irq(int irq, void *dev_id)
 {
-	struct ad242x_master *master = devid;
-	int ret;
+	struct ad242x_master *master = dev_id;
 
-	ret = ad242x_read_irqs(master);
-	if (ret == -ENOENT)
+	if (ad242x_read_one_irq(master) < 0)
 		return IRQ_NONE;
 
 	return IRQ_HANDLED;
@@ -168,6 +180,50 @@ static int ad242x_wait_for_irq(struct ad242x_master *master,
 
 	return ret == 0 ? -ETIMEDOUT : 0;
 }
+
+static void ad242x_irq_ack(struct irq_data *data)
+{
+	printk(KERN_ERR "___ %s()\n", __func__);
+}
+
+static void ad242x_irq_mask(struct irq_data *data)
+{
+	struct ad242x_master *master = irq_data_get_irq_chip_data(data);
+
+	master->irq_mask |= BIT(data->hwirq);
+}
+
+static void ad242x_irq_unmask(struct irq_data *data)
+{
+	struct ad242x_master *master = irq_data_get_irq_chip_data(data);
+
+	master->irq_mask &= ~BIT(data->hwirq);
+}
+
+static struct irq_chip ad242x_irq_chip = {
+	.name		= "ad242x",
+	.irq_ack	= ad242x_irq_ack,
+	.irq_mask	= ad242x_irq_mask,
+	.irq_unmask	= ad242x_irq_unmask,
+};
+
+static int ad242x_irq_domain_map(struct irq_domain *d, unsigned int irq,
+				  irq_hw_number_t hw)
+{
+	struct ad242x_master *master = d->host_data;
+
+	irq_set_chip_data(irq, master);
+	irq_set_chip_and_handler(irq, &ad242x_irq_chip, handle_edge_irq);
+	irq_set_nested_thread(irq, 1);
+	// irq_set_nothread(irq);
+	irq_set_noprobe(irq);
+
+	return 0;
+}
+
+static const struct irq_domain_ops ad242x_irq_domain_ops = {
+	.map = ad242x_irq_domain_map,
+};
 
 /* See Table 3-2 in the datasheet */
 static unsigned int ad242x_bus_bits(unsigned int slot_size, bool alt_fmt)
@@ -299,7 +355,7 @@ static int ad242x_discover(struct ad242x_master *master,
 			return ret;
 
 		ret = ad242x_wait_for_irq(master,
-					  &master->discover_completion, 35);
+					  &master->discover_completion, 50);
 		if (ret < 0) {
 			dev_err(dev, "Discovery of node %d timed out\n", i);
 			return ret;
@@ -369,14 +425,6 @@ static int ad242x_init_irq(struct ad242x_master *master)
 	struct device *dev = master->node.dev;
 	int ret;
 
-	if (master->irq > 0) {
-		ret = devm_request_threaded_irq(dev, master->irq, NULL,
-						ad242x_handle_irq, IRQF_ONESHOT,
-						dev_name(dev), master);
-		if (ret < 0)
-			return ret;
-	}
-
 	ret = regmap_write(regmap, AD242X_INTMSK0,
 			   AD242X_INTMSK0_SRFEIEN | AD242X_INTMSK0_BECIEN |
 			   AD242X_INTMSK0_PWREIEN | AD242X_INTMSK0_CRCEIEN |
@@ -388,6 +436,15 @@ static int ad242x_init_irq(struct ad242x_master *master)
 			   AD242X_INTMSK2_DSCDIEN | AD242X_INTMSK2_SLVIRQEN);
 	if (ret < 0)
 		return ret;
+
+	master->irq_domain =
+		irq_domain_add_linear(dev->of_node, 16 /* XXX */,
+				      &ad242x_irq_domain_ops, master);
+	if (!master->irq_domain)
+		return -ENODEV;
+
+	/* Mask all slave IRQs */
+	master->irq_mask = 0xffff;
 
 	return 0;
 }
@@ -484,6 +541,16 @@ static int ad242x_master_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
+	if (master->irq > 0) {
+		ret = devm_request_threaded_irq(dev, master->irq, NULL,
+						ad242x_handle_irq, IRQF_ONESHOT,
+						dev_name(dev), master);
+		if (ret < 0) {
+			dev_err(dev, "IRQ request failed: %d\n", ret);
+			return ret;
+		}
+	}
+
 	/* Master node setup */
 
 	ret = regmap_write(regmap, AD242X_CONTROL,
@@ -491,7 +558,7 @@ static int ad242x_master_probe(struct i2c_client *i2c,
 	if (ret < 0)
 		return ret;
 
-	ret = ad242x_wait_for_irq(master, &master->run_completion, 10);
+	ret = ad242x_wait_for_irq(master, &master->run_completion, 100);
 	if (ret < 0) {
 		dev_err(dev, "timeout waiting for PLL sync: %d\n", ret);
 		return ret;
