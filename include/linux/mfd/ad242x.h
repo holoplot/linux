@@ -79,6 +79,8 @@
 
 #define AD242X_INTTYPE			0x17
 
+#define AD242X_INTTYPE_IO0PND		16
+#define AD242X_INTTYPE_IO7PND		23
 #define AD242X_INTTYPE_DSCDONE		24
 #define AD242X_INTTYPE_MSTR_RUNNING	255
 
@@ -93,7 +95,6 @@
 #define AD242X_INTPDN0_SRFCRCERR	BIT(7)
 
 #define AD242X_INTPND1			0x19
-#define AD242X_INTPND1_IOPND(X)		BIT(X)
 
 #define AD242X_INTPND2			0x1a
 #define AD242X_INTPND2_DSCDONE		BIT(0)
@@ -389,6 +390,7 @@ struct ad242x_node *ad242x_master_get_node(struct ad242x_master *master);
 struct ad242x_i2c_bus *ad242x_master_get_bus(struct ad242x_master *master);
 const char *ad242x_master_get_clk_name(struct ad242x_master *master);
 unsigned int ad242x_master_get_clk_rate(struct ad242x_master *master);
+u8 ad242x_node_inttype(struct ad242x_node *node);
 
 int ad242x_slave_read(struct ad242x_i2c_bus *bus,
 		      struct regmap *master_regmap,
