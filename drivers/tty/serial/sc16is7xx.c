@@ -1183,6 +1183,7 @@ static int sc16is7xx_probe(struct device *dev,
 	u32 uartclk = 0;
 	int i, ret;
 	struct sc16is7xx_port *s;
+	bool irda_mode;
 
 	if (IS_ERR(regmap))
 		return PTR_ERR(regmap);
@@ -1193,6 +1194,8 @@ static int sc16is7xx_probe(struct device *dev,
 		dev_err(dev, "Error allocating port structure\n");
 		return -ENOMEM;
 	}
+
+	irda_mode = device_property_read_bool(dev, "linux,irda-mode");
 
 	/* Always ask for fixed clock rate from a property. */
 	device_property_read_u32(dev, "clock-frequency", &uartclk);
@@ -1294,6 +1297,11 @@ static int sc16is7xx_probe(struct device *dev,
 				     SC16IS7XX_EFR_ENABLE_BIT);
 
 		regcache_cache_bypass(s->regmap, false);
+
+		/* Enable IrDA mode, if set in dt */
+		sc16is7xx_port_update(&s->p[i].port, SC16IS7XX_MCR_REG,
+				      SC16IS7XX_MCR_IRDA_BIT,
+				      irda_mode ? SC16IS7XX_MCR_IRDA_BIT : 0);
 
 		/* Restore access to general registers */
 		sc16is7xx_port_write(&s->p[i].port, SC16IS7XX_LCR_REG, 0x00);
