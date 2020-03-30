@@ -568,6 +568,7 @@ static int at24_probe(struct i2c_client *client)
 	bool writable;
 	u8 test_byte;
 	int err;
+	const char *name;
 
 	i2c_fn_i2c = i2c_check_functionality(client->adapter, I2C_FUNC_I2C);
 	i2c_fn_block = i2c_check_functionality(client->adapter,
@@ -576,6 +577,9 @@ static int at24_probe(struct i2c_client *client)
 	cdata = at24_get_chip_data(dev);
 	if (IS_ERR(cdata))
 		return PTR_ERR(cdata);
+
+	if (device_property_read_string(dev, "linux,eeprom-name", &name))
+		name = dev_name(dev);
 
 	err = device_property_read_u32(dev, "pagesize", &page_size);
 	if (err)
@@ -681,7 +685,7 @@ static int at24_probe(struct i2c_client *client)
 			return err;
 	}
 
-	nvmem_config.name = dev_name(dev);
+	nvmem_config.name = name;
 	nvmem_config.dev = dev;
 	nvmem_config.read_only = !writable;
 	nvmem_config.root_only = !(flags & AT24_FLAG_IRUGO);
