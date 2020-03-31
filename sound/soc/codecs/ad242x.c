@@ -286,6 +286,16 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 	priv->pdm_highpass = of_property_read_bool(dev->of_node,
 						   "adi,pdm-highpass-filter");
 
+	// HACK
+	if (ad242x_node_is_master(priv->node)) {
+		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x09);
+	} else {
+		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x08);
+		regmap_write(priv->node->regmap, AD242X_PDMCTL, 0x13);
+		regmap_write(priv->node->regmap, AD242X_PDMCTL2, 0x00);
+		regmap_write(priv->node->regmap, AD242X_CLK2CFG, 0x01);
+	}
+
 	return devm_snd_soc_register_component(dev,
 					       &soc_component_device_ad242x,
 					       ad242x_dai,
