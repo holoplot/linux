@@ -140,6 +140,8 @@ int ad242x_node_probe(struct ad242x_node *node)
 	if (of_property_read_bool(np, "adi,invert-sync"))
 		val |= AD242X_I2SGCTL_INV;
 
+printk(KERN_ERR "%s() node id %d writing I2SGCTL -> %02x\n", __func__, node->id, val);
+
 	ret = regmap_write(node->regmap, AD242X_I2SGCTL, val);
 	if (ret < 0)
 		return ret;
