@@ -75,7 +75,7 @@ int ad242x_node_probe(struct ad242x_node *node)
 		return ret;
 	}
 
-	if (node->id == AD242X_MASTER_ID)
+	if (ad242x_node_is_master(node))
 		dev_info(node->dev,
 			 "Detected AD242x master node, version %d.%d\n",
 			 val >> 4, val & 0xf);
@@ -114,7 +114,8 @@ int ad242x_node_probe(struct ad242x_node *node)
 	of_property_read_u32(np, "adi,tdm-mode", &node->tdm_mode);
 	of_property_read_u32(np, "adi,tdm-slot-size", &node->tdm_slot_size);
 
-	ret = ad242x_tdmmode_index(node->tdm_mode, false);
+	ret = ad242x_tdmmode_index(node->tdm_mode,
+				   !ad242x_node_is_master(node));
 	if (ret < 0) {
 		dev_err(node->dev, "invalid TDM mode %d\n", node->tdm_mode);
 		return -EINVAL;
