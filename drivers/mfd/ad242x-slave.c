@@ -177,7 +177,8 @@ static int ad242x_slave_probe(struct platform_device *pdev)
 
 	ret = regmap_write(regmap, AD242X_LDNSLOTS,
 			   slave->slot_config.dn_n_tx_slots |
-			   AD242X_LDNSLOTS_DNMASKEN);
+			   (slave->slot_config.dn_rx_slots ?
+			   AD242X_LDNSLOTS_DNMASKEN : 0));
 	if (ret < 0)
 		return ret;
 
@@ -203,12 +204,6 @@ static int ad242x_slave_probe(struct platform_device *pdev)
 	ret = regmap_write(regmap, AD242X_SYNCOFFSET, ret);
 	if (ret < 0)
 		return ret;
-
-	ret = ad242x_node_add_mfd_cells(dev);
-	if (ret < 0) {
-		dev_err(dev, "failed to add MFD devices %d\n", ret);
-		return ret;
-	}
 
 	return 0;
 }

@@ -30,6 +30,7 @@ struct ad242x_master {
 	int			irq;
 	u8			response_cycles;
 	u8			node_inttype[17];
+	bool			up_enabled, dn_enabled;
 };
 
 struct ad242x_node *ad242x_master_get_node(struct ad242x_master *master)
@@ -82,9 +83,16 @@ static int ad242x_read_one_irq(struct ad242x_master *master)
 {
 	struct regmap *regmap = master->node.regmap;
 	struct device *dev = master->node.dev;
-	unsigned int val, intsrc, inttype;
+	unsigned int val, intstat, intsrc, inttype;
 	u8 node_id;
 	int ret;
+
+	ret = regmap_read(regmap, AD242X_INTSTAT, &intstat);
+	if (ret < 0)
+		return ret;
+
+	if ((intstat & AD242X_INTSTAT_IRQ) == 0)
+		return -ENOENT;
 
 	ret = regmap_read(regmap, AD242X_INTSRC, &intsrc);
 	if (ret < 0)
@@ -247,6 +255,14 @@ static unsigned int ad242x_master_respoffs(struct ad242x_node *node)
 	return 248;
 }
 
+static int ad242x_newstrct(struct ad242x_master *master)
+{
+	return regmap_update_bits(master->node.regmap,
+				  AD242X_CONTROL,
+				  AD242X_CONTROL_NEWSTRCT,
+				  AD242X_CONTROL_NEWSTRCT);
+}
+
 static int ad242x_discover(struct ad242x_master *master,
 			   struct device_node *nodes_np)
 {
@@ -258,7 +274,6 @@ static int ad242x_discover(struct ad242x_master *master,
 	unsigned int respcycs_dn_max = 0;
 	unsigned int master_up_slots = 0;
 	unsigned int master_dn_slots = 0;
-	bool up_enabled = false, dn_enabled = false;
 	uint8_t slave_control = 0;
 	int ret;
 
@@ -280,7 +295,7 @@ static int ad242x_discover(struct ad242x_master *master,
 		slave_dn_slots = max_t(int, slot_config.dn_n_forward_slots,
 				       fls(slot_config.dn_rx_slots));
 		slave_up_slots = max_t(int, slot_config.up_n_forward_slots,
-				       fls(slot_config.up_rx_slots));
+				       slot_config.up_n_tx_slots);
 
 		if (n == 0) {
 			master_up_slots = slave_up_slots;
@@ -306,10 +321,10 @@ static int ad242x_discover(struct ad242x_master *master,
 			respcycs_up_min = respcycs_up;
 
 		if (slave_dn_slots > 0)
-			dn_enabled = true;
+			master->dn_enabled = true;
 
 		if (slave_up_slots > 0)
-			up_enabled = true;
+			master->up_enabled = true;
 
 		n++;
 	}
@@ -339,9 +354,7 @@ static int ad242x_discover(struct ad242x_master *master,
 	if (ret < 0)
 		return ret;
 
-	ret = regmap_update_bits(regmap, AD242X_CONTROL,
-				 AD242X_CONTROL_NEWSTRCT,
-				 AD242X_CONTROL_NEWSTRCT);
+	ret = ad242x_newstrct(master);
 	if (ret < 0)
 		return ret;
 
@@ -397,22 +410,15 @@ static int ad242x_discover(struct ad242x_master *master,
 		reinit_completion(&master->discover_completion);
 	}
 
+	ret = regmap_write(regmap, AD242X_SWCTL, AD242X_SWCTL_ENSW);
+	if (ret < 0)
+		return ret;
+
 	ret = regmap_write(regmap, AD242X_DNSLOTS, master_dn_slots);
 	if (ret < 0)
 		return ret;
 
 	ret = regmap_write(regmap, AD242X_UPSLOTS, master_up_slots);
-	if (ret < 0)
-		return ret;
-
-	val = 0;
-	if (dn_enabled)
-		val |= AD242X_DATCTL_DNS;
-
-	if (up_enabled)
-		val |= AD242X_DATCTL_UPS;
-
-	ret = regmap_write(regmap, AD242X_DATCTL, val);
 	if (ret < 0)
 		return ret;
 
@@ -463,10 +469,11 @@ static int ad242x_master_probe(struct i2c_client *i2c,
 {
 	struct device_node *bus_np, *nodes_np, *np;
 	struct device *busdev, *dev = &i2c->dev;
+	struct platform_device *slave_pdev[16];
 	struct ad242x_master *master;
 	struct regmap *regmap;
 	unsigned int val;
-	int ret;
+	int ret, i, n;
 
 	nodes_np = of_get_child_by_name(dev->of_node, "nodes");
 	if (!nodes_np) {
@@ -602,19 +609,6 @@ static int ad242x_master_probe(struct i2c_client *i2c,
 		of_property_read_bool(dev->of_node,
 				      "adi,alternate-upstream-slot-format");
 
-	val = AD242X_SLOTFMT_DNSIZE(master->dn_slot_size) |
-	      AD242X_SLOTFMT_UPSIZE(master->up_slot_size);
-
-	if (master->dn_slot_alt_fmt)
-		val |= AD242X_SLOTFMT_DNFMT;
-
-	if (master->up_slot_alt_fmt)
-		val |= AD242X_SLOTFMT_UPFMT;
-
-	ret = regmap_write(regmap, AD242X_SLOTFMT, val);
-	if (ret < 0)
-		return ret;
-
 	/* Node discovery and MFD setup */
 
 	ret = ad242x_discover(master, nodes_np);
@@ -630,11 +624,47 @@ static int ad242x_master_probe(struct i2c_client *i2c,
 	}
 
 	/* Register platform devices for nodes */
+	n =  0;
 
-	for_each_available_child_of_node(nodes_np, np)
-		of_platform_device_create(np, NULL, dev);
+	for_each_available_child_of_node(nodes_np, np) {
+		slave_pdev[n++] = of_platform_device_create(np, NULL, dev);
+	}
 
-	of_node_put(nodes_np);
+	val = AD242X_SLOTFMT_DNSIZE(master->dn_slot_size) |
+	      AD242X_SLOTFMT_UPSIZE(master->up_slot_size);
+
+	if (master->dn_slot_alt_fmt)
+		val |= AD242X_SLOTFMT_DNFMT;
+
+	if (master->up_slot_alt_fmt)
+		val |= AD242X_SLOTFMT_UPFMT;
+
+	ret = regmap_write(regmap, AD242X_SLOTFMT, val);
+	if (ret < 0)
+		return ret;
+
+	val = 0;
+	if (master->dn_enabled)
+		val |= AD242X_DATCTL_DNS;
+
+	if (master->up_enabled)
+		val |= AD242X_DATCTL_UPS;
+
+	ret = regmap_write(regmap, AD242X_DATCTL, val);
+	if (ret < 0)
+		return ret;
+
+	ret = ad242x_newstrct(master);
+	if (ret < 0)
+		return ret;
+
+	for (i = 0; i < n; i++) {
+		ret = ad242x_node_add_mfd_cells(&slave_pdev[i]->dev);
+		if (ret < 0) {
+			dev_err(dev, "failed to add MFD devices %d\n", ret);
+			return ret;
+		}
+	}
 
 	return 0;
 }

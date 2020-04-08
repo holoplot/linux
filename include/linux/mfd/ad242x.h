@@ -309,6 +309,8 @@ static inline bool ad242x_is_volatile_reg(struct device *dev, unsigned int reg)
 	case AD242X_PRODUCT:
 	case AD242X_VERSION:
 	case AD242X_CAPABILITY:
+	case AD242X_DATCTL:
+	case AD242X_CONTROL:
 	case AD242X_SWSTAT:
 	case AD242X_INTSTAT:
 	case AD242X_INTSRC:
@@ -334,8 +336,10 @@ static inline bool ad242x_is_volatile_reg(struct device *dev, unsigned int reg)
 
 static inline bool ad242x_is_writeable_reg(struct device *dev, unsigned int reg)
 {
-	/* Write-to-clean registers */
 	switch (reg) {
+	case AD242X_DATCTL:
+	case AD242X_CONTROL:
+	/* Write-to-clean registers */
 	case AD242X_INTPND0:
 	case AD242X_INTPND1:
 	case AD242X_INTPND2:
