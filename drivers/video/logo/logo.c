@@ -100,6 +100,9 @@ const struct linux_logo * __ref fb_find_logo(int depth)
 		/* SuperH Linux logo */
 		logo = &logo_superh_clut224;
 #endif
+#ifdef CONFIG_LOGO_HOLOPLOT_CLUT224
+		logo = &logo_holoplot_clut224;
+#endif
 	}
 	return logo;
 }
