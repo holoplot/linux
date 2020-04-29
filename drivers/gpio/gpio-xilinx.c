@@ -470,26 +470,32 @@ static void xgpio_irqhandler(struct irq_desc *desc)
 	struct xgpio_instance *chip = (struct xgpio_instance *)
 		irq_get_handler_data(irq);
 	struct irq_chip *irqchip = irq_desc_get_chip(desc);
-	u32 offset, status, channel = 1;
+	u32 gpio, offset, ipisr;
 	unsigned long val;
 
-	chained_irq_enter(irqchip, desc);
+	ipisr = xgpio_readreg(chip->regs + XGPIO_IPISR_OFFSET);
+	xgpio_writereg(chip->regs + XGPIO_IPISR_OFFSET, ipisr);
 
-	val = xgpio_readreg(chip->regs);
-	if (!val) {
-		channel = 2;
-		val = xgpio_readreg(chip->regs + XGPIO_CHANNEL_OFFSET);
-		val = val << chip->gpio_width[0];
-	}
+	if (ipisr & 1)
+		offset = 0;
+	else if (ipisr & 2)
+		offset = XGPIO_CHANNEL_OFFSET;
+	else
+		return;
+
+	val = xgpio_readreg(chip->regs + offset);
+	if (offset > 0)
+		val <<= chip->gpio_width[0];
 
 	/* Only rising edge is supported */
 	val &= chip->irq_enable;
-	for_each_set_bit(offset, &val, chip->gc.ngpio) {
-		generic_handle_irq(chip->irq_base + offset);
-	}
 
-	status = xgpio_readreg(chip->regs + XGPIO_IPISR_OFFSET);
-	xgpio_writereg(chip->regs + XGPIO_IPISR_OFFSET, channel);
+	chained_irq_enter(irqchip, desc);
+
+	for_each_set_bit(gpio, &val, chip->gc.ngpio) {
+		int irq = irq_find_mapping(chip->irq_domain, gpio);
+		generic_handle_irq(irq);
+	}
 
 	chained_irq_exit(irqchip, desc);
 }
@@ -505,11 +511,11 @@ static struct lock_class_key gpio_request_class;
  * Return:
  * 0 if success, otherwise -1
  */
-static int xgpio_irq_setup(struct device_node *np, struct xgpio_instance *chip)
+static int xgpio_irq_setup(struct device *dev, struct xgpio_instance *chip)
 {
 	u32 pin_num;
 	struct resource res;
-	int ret = of_irq_to_resource(np, 0, &res);
+	int ret = of_irq_to_resource(dev->of_node, 0, &res);
 
 	if (ret <= 0) {
 		pr_info("GPIO IRQ not connected\n");
@@ -517,14 +523,20 @@ static int xgpio_irq_setup(struct device_node *np, struct xgpio_instance *chip)
 	}
 
 	chip->gc.to_irq = xgpio_to_irq;
-	chip->irq_base = irq_alloc_descs(-1, 0, chip->gc.ngpio, 0);
+	chip->irq_base = devm_irq_alloc_descs(dev, -1, 0, chip->gc.ngpio, 0);
 	if (chip->irq_base < 0) {
 		pr_err("Couldn't allocate IRQ numbers\n");
-		return -1;
+		return -ENOMEM;
 	}
-	chip->irq_domain = irq_domain_add_legacy(np, chip->gc.ngpio,
+
+	chip->irq_domain = irq_domain_add_legacy(dev->of_node, chip->gc.ngpio,
 						 chip->irq_base, 0,
 						 &irq_domain_simple_ops, NULL);
+	if (!chip->irq_domain) {
+		pr_err("Couldn't add IRQ domain");
+		return -ENODEV;
+	}
+
 	/*
 	 * set the irq chip, handler and irq chip data for callbacks for
 	 * each pin
@@ -657,7 +669,7 @@ static int xgpio_probe(struct platform_device *pdev)
 		goto err_pm_put;
 	}
 
-	status = xgpio_irq_setup(np, chip);
+	status = xgpio_irq_setup(&pdev->dev, chip);
 	if (status) {
 		pr_err("%s: GPIO IRQ initialization failed %d\n",
 		       np->full_name, status);
