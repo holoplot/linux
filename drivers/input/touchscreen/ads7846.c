@@ -27,7 +27,7 @@
 #include <linux/of.h>
 #include <linux/of_gpio.h>
 #include <linux/of_device.h>
-#include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/ads7846.h>
 #include <linux/regulator/consumer.h>
@@ -136,7 +136,7 @@ struct ads7846 {
 	int			(*filter)(void *data, int data_idx, int *val);
 	void			*filter_data;
 	int			(*get_pendown_state)(void);
-	int			gpio_pendown;
+	struct gpio_desc	*gpio_pendown;
 
 	void			(*wait_for_sync)(void);
 };
@@ -603,7 +603,7 @@ static int get_pendown_state(struct ads7846 *ts)
 	if (ts->get_pendown_state)
 		return ts->get_pendown_state();
 
-	return !gpio_get_value(ts->gpio_pendown);
+	return !gpiod_get_value(ts->gpio_pendown);
 }
 
 static void null_wait_for_sync(void)
@@ -924,6 +924,7 @@ static int ads7846_setup_pendown(struct spi_device *spi,
 				 struct ads7846 *ts,
 				 const struct ads7846_platform_data *pdata)
 {
+	struct device *dev = &spi->dev;
 	int err;
 
 	/*
@@ -934,26 +935,32 @@ static int ads7846_setup_pendown(struct spi_device *spi,
 
 	if (pdata->get_pendown_state) {
 		ts->get_pendown_state = pdata->get_pendown_state;
-	} else if (gpio_is_valid(pdata->gpio_pendown)) {
+		return 0;
+	}
 
-		err = devm_gpio_request_one(&spi->dev, pdata->gpio_pendown,
-					    GPIOF_IN, "ads7846_pendown");
-		if (err) {
-			dev_err(&spi->dev,
-				"failed to request/setup pendown GPIO%d: %d\n",
-				pdata->gpio_pendown, err);
-			return err;
+	ts->gpio_pendown = devm_gpiod_get(dev, "pendown", GPIOD_IN);
+	if (IS_ERR(ts->gpio_pendown)) {
+		err = PTR_ERR(ts->gpio_pendown);
+
+		if (gpio_is_valid(pdata->gpio_pendown)) {
+			err = devm_gpio_request_one(dev, pdata->gpio_pendown,
+						    GPIOF_IN,
+						    "ads7846_pendown");
+			if (err < 0)
+				return err;
+
+			ts->gpio_pendown = gpio_to_desc(pdata->gpio_pendown);
+			if (!ts->gpio_pendown)
+				return -EINVAL;
 		}
 
-		ts->gpio_pendown = pdata->gpio_pendown;
-
-		if (pdata->gpio_pendown_debounce)
-			gpio_set_debounce(pdata->gpio_pendown,
-					  pdata->gpio_pendown_debounce);
-	} else {
-		dev_err(&spi->dev, "no get_pendown_state nor gpio_pendown?\n");
-		return -EINVAL;
+		if (err < 0)
+			return err;
 	}
+
+	if (pdata->gpio_pendown_debounce)
+		gpiod_set_debounce(ts->gpio_pendown,
+				   pdata->gpio_pendown_debounce);
 
 	return 0;
 }
@@ -1241,8 +1248,6 @@ static const struct ads7846_platform_data *ads7846_probe_dt(struct device *dev)
 	pdata->wakeup = of_property_read_bool(node, "wakeup-source") ||
 			of_property_read_bool(node, "linux,wakeup");
 
-	pdata->gpio_pendown = of_get_named_gpio(dev->of_node, "pendown-gpio", 0);
-
 	return pdata;
 }
 #else
@@ -1337,8 +1342,10 @@ static int ads7846_probe(struct spi_device *spi)
 	}
 
 	err = ads7846_setup_pendown(spi, ts, pdata);
-	if (err)
+	if (err) {
+		dev_err(dev, "Unable to request pendown GPIO: %d", err);
 		return err;
+	}
 
 	if (pdata->penirq_recheck_delay_usecs)
 		ts->penirq_recheck_delay_usecs =
