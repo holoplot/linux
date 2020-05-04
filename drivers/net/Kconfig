@@ -644,4 +644,16 @@ config NETDEV_LEGACY_INIT
 	  Drivers that call netdev_boot_setup_check() should select this
 	  symbol, everything else no longer needs it.
 
+config DANTE_DUMMY
+	tristate "Dante dummy net driver support"
+	help
+	  This is essentially a bit-bucket device (i.e. traffic you send to
+	  this device is consigned into oblivion) with a configurable IP
+	  address. It has phlink support and can hence be used to monitor a
+	  link,
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called dante-dummy.
+
+
 endif # NETDEVICES
