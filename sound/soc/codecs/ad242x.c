@@ -319,11 +319,9 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 
 	// HACK
 	if (ad242x_node_is_master(priv->node)) {
-		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x09);
+//		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x09);
 	} else {
-		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x08);
-		regmap_write(priv->node->regmap, AD242X_PDMCTL, 0x13);
-		regmap_write(priv->node->regmap, AD242X_PDMCTL2, 0x00);
+//		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x08);
 		regmap_write(priv->node->regmap, AD242X_CLK2CFG, 0x01);
 	}
 
