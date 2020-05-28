@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/mfd/ad242x.h>
@@ -13,6 +14,7 @@
 
 struct ad242x_private {
 	struct ad242x_node	*node;
+	struct clk		*mclk;
 	unsigned int		inv_fmt;
 	bool			pdm[2];
 	bool			pdm_highpass;
@@ -271,7 +273,10 @@ static const struct snd_soc_component_driver soc_component_device_ad242x = {
 static int ad242x_codec_platform_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
 	struct ad242x_private *priv;
+	u32 mclk_freq;
+	int ret;
 
 	if (!dev->of_node)
 		return -ENODEV;
@@ -280,11 +285,37 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 	if (!priv)
 		return -ENOMEM;
 
+	priv->mclk = devm_clk_get_optional(dev, "mclk");
+	if (priv->mclk) {
+		if (IS_ERR(priv->mclk)) {
+			ret = PTR_ERR(priv->mclk);
+			if (ret != -EPROBE_DEFER)
+				dev_err(dev, "failed to get clk: %d\n", ret);
+
+			return ret;
+		}
+
+		if (!of_property_read_u32(np, "clock-frequency", &mclk_freq)) {
+			ret = clk_set_rate(priv->mclk, mclk_freq);
+			if (ret < 0) {
+				dev_err(dev, "Cannot set mclk frequency %d: %d\n",
+					mclk_freq, ret);
+				return ret;
+			}
+		}
+
+		// FIXME
+
+		ret = clk_prepare_enable(priv->mclk);
+		if (ret < 0)
+			return ret;
+	}
+
 	priv->node = dev_get_drvdata(dev->parent);
 	platform_set_drvdata(pdev, priv);
 
-	priv->pdm_highpass = of_property_read_bool(dev->of_node,
-						   "adi,pdm-highpass-filter");
+	priv->pdm_highpass =
+		of_property_read_bool(np, "adi,pdm-highpass-filter");
 
 	// HACK
 	if (ad242x_node_is_master(priv->node)) {
@@ -302,6 +333,15 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 					       ARRAY_SIZE(ad242x_dai));
 }
 
+static int ad242x_codec_platform_remove(struct platform_device *pdev)
+{
+	struct ad242x_private *priv = dev_get_drvdata(&pdev->dev);
+
+	clk_disable_unprepare(priv->mclk);
+
+	return 0;
+}
+
 static const struct of_device_id ad242x_of_match[] = {
 	{ .compatible = "adi,ad2428w-codec", },
 	{ }
@@ -314,6 +354,7 @@ static struct platform_driver ad242x_platform_driver = {
 		.of_match_table = ad242x_of_match,
 	},
 	.probe  = ad242x_codec_platform_probe,
+	.remove	= ad242x_codec_platform_remove,
 };
 
 module_platform_driver(ad242x_platform_driver);
