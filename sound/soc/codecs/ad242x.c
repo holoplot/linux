@@ -39,7 +39,6 @@ static int ad242x_set_dai_fmt(struct snd_soc_dai *dai,
 {
 	struct snd_soc_component *component = dai->component;
 	struct ad242x_private *priv = snd_soc_component_get_drvdata(component);
-	int ret;
 
 	/* set DAI format */
 	switch (format & SND_SOC_DAIFMT_FORMAT_MASK) {
@@ -59,24 +58,7 @@ static int ad242x_set_dai_fmt(struct snd_soc_dai *dai,
 	 * so we require the settings for DAI1 to match those for DAI0.
 	 */
 	if (dai->id == 0) {
-		switch (format & SND_SOC_DAIFMT_INV_MASK) {
-		case SND_SOC_DAIFMT_NB_NF:
-			priv->inv_fmt = 0;
-			break;
-		case SND_SOC_DAIFMT_IB_NF:
-			priv->inv_fmt = AD242X_I2SCTL_RXBCLKINV;
-			break;
-		case SND_SOC_DAIFMT_NB_IF:
-		case SND_SOC_DAIFMT_IB_IF:
-			dev_err(component->dev, "unsupported inversion mask\n");
-			return -EINVAL;
-		}
-
-		ret = regmap_update_bits(priv->node->regmap, AD242X_I2SCTL,
-					AD242X_I2SCTL_RXBCLKINV,
-					priv->inv_fmt);
-		if (ret < 0)
-			return ret;
+		priv->inv_fmt = format & SND_SOC_DAIFMT_INV_MASK;
 	} else {
 		if ((format & SND_SOC_DAIFMT_INV_MASK) != priv->inv_fmt) {
 			dev_err(component->dev,
@@ -125,7 +107,7 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	if (priv->pdm[dai->id]) {
-		if (substream->stream != SNDRV_PCM_STREAM_PLAYBACK)
+		if (substream->stream != SNDRV_PCM_STREAM_CAPTURE)
 			return -EINVAL;
 
 		if (dai->id == 0) {
@@ -158,7 +140,7 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 		if (params_channels(params) != priv->node->tdm_mode)
 			return -EINVAL;
 
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 			if (dai->id == 0)
 				mask = AD242X_I2SCTL_RX0EN;
 			else
@@ -170,11 +152,32 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 				mask = AD242X_I2SCTL_TX1EN;
 		}
 
-		ret = regmap_update_bits(priv->node->regmap, AD242X_I2SCTL,
-					 mask, mask);
+		ret = regmap_update_bits(priv->node->regmap, AD242X_I2SCTL, mask, mask);
 		if (ret < 0)
 			return ret;
 	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		mask = AD242X_I2SCTL_RXBCLKINV;
+	else
+		mask = AD242X_I2SCTL_TXBCLKINV;
+
+	switch (priv->inv_fmt) {
+	case SND_SOC_DAIFMT_NB_NF:
+		val = 0;
+		break;
+	case SND_SOC_DAIFMT_IB_NF:
+		val = mask;
+		break;
+	case SND_SOC_DAIFMT_NB_IF:
+	case SND_SOC_DAIFMT_IB_IF:
+		dev_err(component->dev, "unsupported inversion mask\n");
+		return -EINVAL;
+	}
+
+	ret = regmap_update_bits(priv->node->regmap, AD242X_I2SCTL, mask, val);
+	if (ret < 0)
+		return ret;
 
 	if (!ad242x_node_is_master(priv->node)) {
 		val = 0;
@@ -255,11 +258,23 @@ static int ad242x_soc_probe(struct snd_soc_component *component)
 
 	component->regmap = priv->node->regmap;
 
+	if (priv->mclk)
+		return clk_prepare_enable(priv->mclk);
+
 	return 0;
+}
+
+static void ad242x_soc_remove(struct snd_soc_component *component)
+{
+	struct ad242x_private *priv = snd_soc_component_get_drvdata(component);
+
+	if (priv->mclk)
+		clk_disable_unprepare(priv->mclk);
 }
 
 static const struct snd_soc_component_driver soc_component_device_ad242x = {
 	.probe			= ad242x_soc_probe,
+	.remove			= ad242x_soc_remove,
 	.dapm_widgets		= ad242x_dapm_widgets,
 	.num_dapm_widgets	= ARRAY_SIZE(ad242x_dapm_widgets),
 	.dapm_routes		= ad242x_dapm_routes,
@@ -303,12 +318,6 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 				return ret;
 			}
 		}
-
-		// FIXME
-
-		ret = clk_prepare_enable(priv->mclk);
-		if (ret < 0)
-			return ret;
 	}
 
 	priv->node = dev_get_drvdata(dev->parent);
@@ -318,26 +327,13 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 		of_property_read_bool(np, "adi,pdm-highpass-filter");
 
 	// HACK
-	if (ad242x_node_is_master(priv->node)) {
-//		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x09);
-	} else {
-//		regmap_write(priv->node->regmap, AD242X_I2SCTL, 0x08);
+	if (!ad242x_node_is_master(priv->node))
 		regmap_write(priv->node->regmap, AD242X_CLK2CFG, 0x01);
-	}
 
 	return devm_snd_soc_register_component(dev,
 					       &soc_component_device_ad242x,
 					       ad242x_dai,
 					       ARRAY_SIZE(ad242x_dai));
-}
-
-static int ad242x_codec_platform_remove(struct platform_device *pdev)
-{
-	struct ad242x_private *priv = dev_get_drvdata(&pdev->dev);
-
-	clk_disable_unprepare(priv->mclk);
-
-	return 0;
 }
 
 static const struct of_device_id ad242x_of_match[] = {
@@ -352,7 +348,6 @@ static struct platform_driver ad242x_platform_driver = {
 		.of_match_table = ad242x_of_match,
 	},
 	.probe  = ad242x_codec_platform_probe,
-	.remove	= ad242x_codec_platform_remove,
 };
 
 module_platform_driver(ad242x_platform_driver);
