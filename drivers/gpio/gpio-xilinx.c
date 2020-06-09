@@ -12,6 +12,7 @@
 #include <linux/of_device.h>
 #include <linux/of_platform.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 #include <linux/gpio/driver.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
@@ -185,6 +186,30 @@ static void xgpio_set_multiple(struct gpio_chip *gc, unsigned long *mask,
 		       index * XGPIO_CHANNEL_OFFSET, chip->gpio_state[index]);
 
 	spin_unlock_irqrestore(&chip->gpio_lock, flags);
+}
+
+/**
+ * xgpio_get_dir - Get direction of GPIO pin
+ * @gc:     Pointer to gpio_chip device structure.
+ * @gpio:   GPIO signal number.
+ *
+ * Return:
+ * GPIOF_DIR_IN if pin is configured as input,
+ * GPIOF_DIR_OUT otherwise
+ */
+static int xgpio_get_dir(struct gpio_chip *gc, unsigned gpio)
+{
+	unsigned long flags;
+	struct xgpio_instance *chip = gpiochip_get_data(gc);
+	int index = xgpio_index(chip, gpio);
+	int offset = xgpio_offset(chip, gpio);
+	bool dir_in;
+
+	spin_lock_irqsave(&chip->gpio_lock, flags);
+	dir_in = !!(chip->gpio_dir[index] & BIT(offset));
+	spin_unlock_irqrestore(&chip->gpio_lock, flags);
+
+	return dir_in ? GPIOF_DIR_IN : GPIOF_DIR_OUT;
 }
 
 /**
@@ -514,6 +539,7 @@ static int xgpio_probe(struct platform_device *pdev)
 	chip->gc.base = -1;
 	chip->gc.ngpio = chip->gpio_width[0] + chip->gpio_width[1];
 	chip->gc.parent = &pdev->dev;
+	chip->gc.get_direction = xgpio_get_dir;
 	chip->gc.direction_input = xgpio_dir_in;
 	chip->gc.direction_output = xgpio_dir_out;
 	chip->gc.get = xgpio_get;
