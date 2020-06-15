@@ -90,7 +90,7 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 	struct ad242x_private *priv = snd_soc_component_get_drvdata(component);
 	unsigned int sff_rate = ad242x_master_get_clk_rate(priv->node->master);
 	unsigned int rate = params_rate(params);
-	unsigned int val, mask;
+	unsigned int val, mask, i2s_cfg = 0;
 	int ret;
 
 	switch (params_format(params)) {
@@ -142,32 +142,25 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 			if (dai->id == 0)
-				mask = AD242X_I2SCTL_RX0EN;
+				i2s_cfg |= AD242X_I2SCTL_RX0EN;
 			else
-				mask = AD242X_I2SCTL_RX1EN;
+				i2s_cfg |= AD242X_I2SCTL_RX1EN;
 		} else {
 			if (dai->id == 0)
-				mask = AD242X_I2SCTL_TX0EN;
+				i2s_cfg |= AD242X_I2SCTL_TX0EN;
 			else
-				mask = AD242X_I2SCTL_TX1EN;
+				i2s_cfg |= AD242X_I2SCTL_TX1EN;
 		}
-
-		ret = regmap_update_bits(priv->node->regmap, AD242X_I2SCTL, mask, mask);
-		if (ret < 0)
-			return ret;
 	}
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		mask = AD242X_I2SCTL_RXBCLKINV;
-	else
-		mask = AD242X_I2SCTL_TXBCLKINV;
 
 	switch (priv->inv_fmt) {
 	case SND_SOC_DAIFMT_NB_NF:
-		val = 0;
 		break;
 	case SND_SOC_DAIFMT_IB_NF:
-		val = mask;
+		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+			i2s_cfg |= AD242X_I2SCTL_RXBCLKINV;
+		else
+			i2s_cfg |= AD242X_I2SCTL_TXBCLKINV;
 		break;
 	case SND_SOC_DAIFMT_NB_IF:
 	case SND_SOC_DAIFMT_IB_IF:
@@ -175,7 +168,7 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
-	ret = regmap_update_bits(priv->node->regmap, AD242X_I2SCTL, mask, val);
+	ret = regmap_write(priv->node->regmap, AD242X_I2SCTL, i2s_cfg);
 	if (ret < 0)
 		return ret;
 
