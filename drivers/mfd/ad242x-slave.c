@@ -175,10 +175,12 @@ static int ad242x_slave_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
-	ret = regmap_write(regmap, AD242X_LDNSLOTS,
-			   slave->slot_config.dn_n_tx_slots |
-			   (slave->slot_config.dn_rx_slots ?
-			   AD242X_LDNSLOTS_DNMASKEN : 0));
+	val = slave->slot_config.dn_n_tx_slots;
+
+	if (slave->slot_config.dn_rx_slots)
+		val |= AD242X_LDNSLOTS_DNMASKEN;
+
+	ret = regmap_write(regmap, AD242X_LDNSLOTS, val);
 	if (ret < 0)
 		return ret;
 
