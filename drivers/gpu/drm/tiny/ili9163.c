@@ -17,8 +17,6 @@
 #include <video/mipi_display.h>
 
 #define ILI9163_FRMCTR1		0xb1
-#define ILI9163_DISCTRL		0xb6
-#define ILI9163_ETMOD		0xb7
 
 #define ILI9163_PWCTRL1		0xc0
 #define ILI9163_PWCTRL2		0xc1
@@ -27,14 +25,7 @@
 #define ILI9163_PWCTRLA		0xcb
 #define ILI9163_PWCTRLB		0xcf
 
-#define ILI9163_PGAMCTRL	0xe0
-#define ILI9163_NGAMCTRL	0xe1
-#define ILI9163_DTCTRLA		0xe8
-#define ILI9163_DTCTRLB		0xea
-#define ILI9163_PWRSEQ		0xed
-
 #define ILI9163_EN3GAM		0xf2
-#define ILI9163_PUMPCTRL	0xf7
 
 #define ILI9163_MADCTL_BGR	BIT(3)
 #define ILI9163_MADCTL_MV	BIT(5)
