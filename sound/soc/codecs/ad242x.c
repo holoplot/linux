@@ -6,6 +6,7 @@
 #include <linux/mfd/ad242x.h>
 #include <linux/of_device.h>
 #include <linux/slab.h>
+#include <linux/gpio/consumer.h>
 #include <sound/asoundef.h>
 #include <sound/core.h>
 #include <sound/initval.h>
@@ -14,6 +15,7 @@
 
 struct ad242x_private {
 	struct ad242x_node	*node;
+	struct gpio_desc	*mute_gpio;
 	struct clk		*mclk;
 	unsigned int		inv_fmt;
 	bool			pdm[2];
@@ -194,9 +196,23 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+static int ad242x_digital_mute(struct snd_soc_dai *dai, int mute)
+{
+	struct snd_soc_component *component = dai->component;
+	struct ad242x_private *priv = snd_soc_component_get_drvdata(component);
+
+	dev_info(component->dev, "%s() mute %d\n", __func__, mute);
+
+	if (priv->mute_gpio)
+		gpiod_set_value_cansleep(priv->mute_gpio, mute);
+
+	return 0;
+}
+
 static const struct snd_soc_dai_ops ad242x_dai_ops = {
 	.hw_params	= ad242x_hw_params,
 	.set_fmt	= ad242x_set_dai_fmt,
+	.digital_mute	= ad242x_digital_mute,
 };
 
 #define AD242X_RATES (					\
@@ -318,6 +334,10 @@ static int ad242x_codec_platform_probe(struct platform_device *pdev)
 
 	priv->pdm_highpass =
 		of_property_read_bool(np, "adi,pdm-highpass-filter");
+
+	priv->mute_gpio = devm_gpiod_get_optional(dev, "mute", GPIOD_OUT_HIGH);
+	if (IS_ERR(priv->mute_gpio))
+		return PTR_ERR(priv->mute_gpio);
 
 	// HACK
 	if (!ad242x_node_is_master(priv->node))
