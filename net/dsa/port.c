@@ -1984,10 +1984,6 @@ int dsa_shared_port_link_register_of(struct dsa_port *dp)
 				 "Skipping phylink registration for %s port %d\n",
 				 dsa_port_is_cpu(dp) ? "CPU" : "DSA", dp->index);
 		} else {
-			if (ds->ops->phylink_mac_link_down)
-				ds->ops->phylink_mac_link_down(ds, port,
-					MLO_AN_FIXED, PHY_INTERFACE_MODE_NA);
-
 			return dsa_shared_port_phylink_register(dp);
 		}
 		return 0;
