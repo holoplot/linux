@@ -1409,7 +1409,7 @@ static int ads7846_probe(struct spi_device *spi)
 	if (err)
 		return err;
 
-	irq_flags = pdata->irq_flags ? : IRQF_TRIGGER_FALLING;
+	irq_flags = pdata->irq_flags ? : IRQF_TRIGGER_RISING;
 	irq_flags |= IRQF_ONESHOT;
 
 	err = devm_request_threaded_irq(dev, spi->irq,
