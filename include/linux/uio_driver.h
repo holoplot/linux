@@ -13,6 +13,7 @@
 #ifndef _UIO_DRIVER_H_
 #define _UIO_DRIVER_H_
 
+#include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/fs.h>
 #include <linux/interrupt.h>
@@ -103,6 +104,8 @@ struct uio_info {
 	struct uio_port		port[MAX_UIO_PORT_REGIONS];
 	long			irq;
 	unsigned long		irq_flags;
+	int			nclocks;
+	struct clk_bulk_data	*clocks;
 	void			*priv;
 	irqreturn_t (*handler)(int irq, struct uio_info *dev_info);
 	int (*mmap)(struct uio_info *info, struct vm_area_struct *vma);

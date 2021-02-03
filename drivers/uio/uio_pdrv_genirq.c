@@ -102,9 +102,13 @@ static int uio_pdrv_genirq_irqcontrol(struct uio_info *dev_info, s32 irq_on)
 
 static void uio_pdrv_genirq_cleanup(void *data)
 {
-	struct device *dev = data;
+	struct uio_pdrv_genirq_platdata *priv = data;
+	struct uio_info *uioinfo = priv->uioinfo;
 
-	pm_runtime_disable(dev);
+	if (uioinfo->nclocks > 0)
+		clk_bulk_disable_unprepare(uioinfo->nclocks, uioinfo->clocks);
+
+	pm_runtime_disable(&priv->pdev->dev);
 }
 
 static int uio_pdrv_genirq_probe(struct platform_device *pdev)
@@ -218,6 +222,16 @@ static int uio_pdrv_genirq_probe(struct platform_device *pdev)
 		++uiomem;
 	}
 
+	uioinfo->nclocks = devm_clk_bulk_get_all(&pdev->dev, &uioinfo->clocks);
+	if (uioinfo->nclocks > 0) {
+		ret = clk_bulk_prepare_enable(uioinfo->nclocks,
+					      uioinfo->clocks);
+		if (ret < 0) {
+			dev_err(&pdev->dev, "cannot enable clocks: %d\n", ret);
+			return ret;
+		}
+	}
+
 	/* This driver requires no hardware specific kernel code to handle
 	 * interrupts. Instead, the interrupt handler simply disables the
 	 * interrupt in the interrupt controller. User space is responsible
@@ -241,7 +255,7 @@ static int uio_pdrv_genirq_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 
 	ret = devm_add_action_or_reset(&pdev->dev, uio_pdrv_genirq_cleanup,
-				       &pdev->dev);
+				       priv);
 	if (ret)
 		return ret;
 
