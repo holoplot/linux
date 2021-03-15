@@ -47,6 +47,7 @@ CPUFLAGS-1 += $(call cc-option,-mcpu=v$(CPU_VER))
 
 # r31 holds current when in kernel mode
 KBUILD_CFLAGS += -ffixed-r31 $(CPUFLAGS-y) $(CPUFLAGS-1) $(CPUFLAGS-2)
+KBUILD_CFLAGS += -fno-tree-loop-distribute-patterns
 
 head-y := arch/microblaze/kernel/head.o
 libs-y += arch/microblaze/lib/
