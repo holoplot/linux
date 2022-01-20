@@ -50,11 +50,23 @@
 #define ILI9341_MADCTL_MX	BIT(6)
 #define ILI9341_MADCTL_MY	BIT(7)
 
+struct ili9341_cfg {
+	const struct drm_display_mode mode;
+	u32 rgb;
+};
+
+struct ili9341_priv {
+	struct mipi_dbi_dev dbidev;
+	const struct ili9341_cfg *cfg;
+};
+
 static void yx240qv29_enable(struct drm_simple_display_pipe *pipe,
 			     struct drm_crtc_state *crtc_state,
 			     struct drm_plane_state *plane_state)
 {
 	struct mipi_dbi_dev *dbidev = drm_to_mipi_dbi_dev(pipe->crtc.dev);
+	struct ili9341_priv *priv = container_of(dbidev, struct ili9341_priv,
+						dbidev);
 	struct mipi_dbi *dbi = &dbidev->dbi;
 	u8 addr_mode;
 	int ret, idx;
@@ -129,7 +141,10 @@ out_enable:
 			    ILI9341_MADCTL_MX;
 		break;
 	}
-	addr_mode |= ILI9341_MADCTL_BGR;
+
+	if (priv->cfg->rgb == DRM_FORMAT_BGR565)
+		addr_mode |= ILI9341_MADCTL_BGR;
+
 	mipi_dbi_command(dbi, MIPI_DCS_SET_ADDRESS_MODE, addr_mode);
 	mipi_dbi_enable_flush(dbidev, crtc_state, plane_state);
 out_exit:
@@ -140,10 +155,6 @@ static const struct drm_simple_display_pipe_funcs ili9341_pipe_funcs = {
 	.enable = yx240qv29_enable,
 	.disable = mipi_dbi_pipe_disable,
 	.update = mipi_dbi_pipe_update,
-};
-
-static const struct drm_display_mode yx240qv29_mode = {
-	DRM_SIMPLE_MODE(240, 320, 37, 49),
 };
 
 DEFINE_DRM_GEM_CMA_FOPS(ili9341_fops);
@@ -160,14 +171,25 @@ static const struct drm_driver ili9341_driver = {
 	.minor			= 0,
 };
 
+static const struct ili9341_cfg ili9341_cfg = {
+	.mode = { DRM_SIMPLE_MODE(240, 320, 37, 49) },
+	.rgb = DRM_FORMAT_BGR565,
+};
+
+static const struct ili9341_cfg st7789s_cfg = {
+	.mode = { DRM_SIMPLE_MODE(320, 240, 49, 37) },
+	.rgb = DRM_FORMAT_RGB565,
+};
+
 static const struct of_device_id ili9341_of_match[] = {
-	{ .compatible = "adafruit,yx240qv29" },
+	{ .compatible = "adafruit,yx240qv29", .data = &ili9341_cfg },
+	{ .compatible = "sitronix,st7789s", .data = &st7789s_cfg },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, ili9341_of_match);
 
 static const struct spi_device_id ili9341_id[] = {
-	{ "yx240qv29", 0 },
+	{ "yx240qv29", (uintptr_t)&ili9341_cfg },
 	{ }
 };
 MODULE_DEVICE_TABLE(spi, ili9341_id);
@@ -175,17 +197,26 @@ MODULE_DEVICE_TABLE(spi, ili9341_id);
 static int ili9341_probe(struct spi_device *spi)
 {
 	struct device *dev = &spi->dev;
+	const struct ili9341_cfg *cfg;
 	struct mipi_dbi_dev *dbidev;
+	struct ili9341_priv *priv;
 	struct drm_device *drm;
 	struct mipi_dbi *dbi;
 	struct gpio_desc *dc;
 	u32 rotation = 0;
 	int ret;
 
-	dbidev = devm_drm_dev_alloc(dev, &ili9341_driver,
-				    struct mipi_dbi_dev, drm);
-	if (IS_ERR(dbidev))
-		return PTR_ERR(dbidev);
+	cfg = device_get_match_data(&spi->dev);
+	if (!cfg)
+		cfg = (void *)spi_get_device_id(spi)->driver_data;
+
+	priv = devm_drm_dev_alloc(dev, &ili9341_driver,
+				    struct ili9341_priv, dbidev.drm);
+	if (IS_ERR(priv))
+		return PTR_ERR(priv);
+
+	dbidev = &priv->dbidev;
+	priv->cfg = cfg;
 
 	dbi = &dbidev->dbi;
 	drm = &dbidev->drm;
@@ -208,7 +239,7 @@ static int ili9341_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	ret = mipi_dbi_dev_init(dbidev, &ili9341_pipe_funcs, &yx240qv29_mode, rotation);
+	ret = mipi_dbi_dev_init(dbidev, &ili9341_pipe_funcs, &cfg->mode, rotation);
 	if (ret)
 		return ret;
 
