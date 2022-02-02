@@ -1,10 +1,10 @@
-Ilitek ILI9341 display panels
+Ilitek ILI9341/ST7789S display panels
 
-This binding is for display panels using an Ilitek ILI9341 controller in SPI
-mode.
+This binding is for display panels using either an Ilitek ILI9341 or a
+Sitronix ST7789S controller in SPI mode.
 
 Required properties:
-- compatible:	"adafruit,yx240qv29", "ilitek,ili9341"
+- compatible:	"adafruit,yx240qv29", "ilitek,ili9341", "sitronix,st7789s"
 - dc-gpios:	D/C pin
 - reset-gpios:	Reset pin
 
