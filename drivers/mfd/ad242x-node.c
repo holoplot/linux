@@ -41,7 +41,7 @@ static int ad242x_tdmmode_index(unsigned int mode, bool slave)
 int ad242x_node_probe(struct ad242x_node *node)
 {
 	struct device_node *np = node->dev->of_node;
-	unsigned int val;
+	unsigned int val, productid;
 	int ret;
 
 	ret = regmap_read(node->regmap, AD242X_VENDOR, &val);
@@ -56,16 +56,16 @@ int ad242x_node_probe(struct ad242x_node *node)
 		return -ENODEV;
 	}
 
-	ret = regmap_read(node->regmap, AD242X_PRODUCT, &val);
+	ret = regmap_read(node->regmap, AD242X_PRODUCT, &productid);
 	if (ret < 0) {
 		dev_err(node->dev, "failed to read PRODUCT register %d\n",
 			ret);
 		return ret;
 	}
 
-	if (val != 0x28) {
+	if (productid != 0x26 && productid != 0x27 && productid != 0x28) {
 		dev_err(node->dev, "bogus value 0x%02x in PRODUCT register\n",
-			val);
+			productid);
 		return -ENODEV;
 	}
 
@@ -77,12 +77,12 @@ int ad242x_node_probe(struct ad242x_node *node)
 
 	if (ad242x_node_is_master(node))
 		dev_info(node->dev,
-			 "Detected AD242x master node, version %d.%d\n",
-			 val >> 4, val & 0xf);
+			 "Detected AD242%1x master node, version %d.%d\n",
+			 productid & 0xf, val >> 4, val & 0xf);
 	else
 		dev_info(node->dev,
-			 "Detected AD242x slave node, version %d.%d, id %d\n",
-			 val >> 4, val & 0xf, node->id);
+			 "Detected AD242%1x slave node, version %d.%d, id %d\n",
+			 productid & 0xf, val >> 4, val & 0xf, node->id);
 
 	ret = regmap_read(node->regmap, AD242X_CAPABILITY, &val);
 	if (ret < 0) {
