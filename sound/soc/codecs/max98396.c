@@ -345,6 +345,10 @@ static void max98396_global_enable_onoff(struct regmap *regmap, bool onoff)
 	usleep_range(11000, 12000);
 }
 
+static int max98396_dai_tdm_slot(struct snd_soc_dai *dai,
+				 unsigned int tx_mask, unsigned int rx_mask,
+				 int slots, int slot_width);
+
 static int max98396_dai_set_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 {
 	struct snd_soc_component *component = codec_dai->component;
@@ -358,7 +362,10 @@ static int max98396_dai_set_fmt(struct snd_soc_dai *codec_dai, unsigned int fmt)
 	format_mask = MAX98396_PCM_MODE_CFG_FORMAT_MASK |
 		      MAX98396_PCM_MODE_CFG_LRCLKEDGE;
 
+	max98396_dai_tdm_slot(codec_dai, 0, 1, 1, 32);
+
 	dev_dbg(component->dev, "%s: fmt 0x%08X\n", __func__, fmt);
+	dev_err(component->dev, "___ %s() tdm_mode %d\n", __func__, max98396->tdm_mode);
 
 	switch (fmt & SND_SOC_DAIFMT_INV_MASK) {
 	case SND_SOC_DAIFMT_NB_NF:
@@ -677,6 +684,11 @@ static int max98396_dai_tdm_slot(struct snd_soc_dai *dai,
 	int reg;
 	bool update = false;
 
+	tx_mask = 0;
+	rx_mask = 0;
+	slot_width = 32;
+	slots = 8;
+
 	if (!tx_mask && !rx_mask && !slots && !slot_width)
 		max98396->tdm_mode = false;
 	else
@@ -786,10 +798,9 @@ static int max98396_dai_tdm_slot(struct snd_soc_dai *dai,
 	return 0;
 }
 
-#define MAX98396_RATES SNDRV_PCM_RATE_8000_192000
+#define MAX98396_RATES SNDRV_PCM_RATE_48000
 
-#define MAX98396_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
-	SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
+#define MAX98396_FORMATS SNDRV_PCM_FMTBIT_S32_LE
 
 static const struct snd_soc_dai_ops max98396_dai_ops = {
 	.set_fmt = max98396_dai_set_fmt,
@@ -1385,7 +1396,7 @@ static int max98396_probe(struct snd_soc_component *component)
 	/* L/R mix configuration */
 	if (max98396->device_id == CODEC_TYPE_MAX98396) {
 		regmap_write(max98396->regmap,
-			     MAX98396_R2055_PCM_RX_SRC1, 0x02);
+			     MAX98396_R2055_PCM_RX_SRC1, 0x00); // XXX
 		regmap_write(max98396->regmap,
 			     MAX98396_R2056_PCM_RX_SRC2, 0x10);
 	} else {
@@ -1422,6 +1433,10 @@ static int max98396_probe(struct snd_soc_component *component)
 	regmap_write(max98396->regmap,
 		     MAX98396_R2058_PCM_BYPASS_SRC,
 		     max98396->bypass_slot);
+	regmap_update_bits(max98396->regmap,
+			   MAX98396_R205E_PCM_RX_EN,
+			   MAX98396_PCM_RX_BYP_EN_MASK,
+			   MAX98396_PCM_RX_BYP_EN_MASK);
 	/* Voltage, current slot configuration */
 	regmap_write(max98396->regmap,
 		     MAX98396_R2044_PCM_TX_CTRL_1,

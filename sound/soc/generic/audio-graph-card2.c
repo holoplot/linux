@@ -891,7 +891,7 @@ int audio_graph2_link_c2c(struct asoc_simple_priv *priv,
 	c2c_conf->rate_min	=
 	c2c_conf->rate_max	= val;
 	c2c_conf->channels_min	=
-	c2c_conf->channels_max	= 2; /* update ME */
+	c2c_conf->channels_max	= 1; /* update ME */
 	dai_link->params	= c2c_conf;
 
 	ep0 = port_to_endpoint(port0);
