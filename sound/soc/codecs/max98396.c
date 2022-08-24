@@ -786,10 +786,9 @@ static int max98396_dai_tdm_slot(struct snd_soc_dai *dai,
 	return 0;
 }
 
-#define MAX98396_RATES SNDRV_PCM_RATE_8000_192000
+#define MAX98396_RATES SNDRV_PCM_RATE_48000
 
-#define MAX98396_FORMATS (SNDRV_PCM_FMTBIT_S16_LE | \
-	SNDRV_PCM_FMTBIT_S24_LE | SNDRV_PCM_FMTBIT_S32_LE)
+#define MAX98396_FORMATS SNDRV_PCM_FMTBIT_S32_LE
 
 static const struct snd_soc_dai_ops max98396_dai_ops = {
 	.set_fmt = max98396_dai_set_fmt,
@@ -1385,7 +1384,7 @@ static int max98396_probe(struct snd_soc_component *component)
 	/* L/R mix configuration */
 	if (max98396->device_id == CODEC_TYPE_MAX98396) {
 		regmap_write(max98396->regmap,
-			     MAX98396_R2055_PCM_RX_SRC1, 0x02);
+			     MAX98396_R2055_PCM_RX_SRC1, 0x00); // XXX
 		regmap_write(max98396->regmap,
 			     MAX98396_R2056_PCM_RX_SRC2, 0x10);
 	} else {
@@ -1422,6 +1421,10 @@ static int max98396_probe(struct snd_soc_component *component)
 	regmap_write(max98396->regmap,
 		     MAX98396_R2058_PCM_BYPASS_SRC,
 		     max98396->bypass_slot);
+	regmap_update_bits(max98396->regmap,
+			   MAX98396_R205E_PCM_RX_EN,
+			   MAX98396_PCM_RX_BYP_EN_MASK,
+			   MAX98396_PCM_RX_BYP_EN_MASK);
 	/* Voltage, current slot configuration */
 	regmap_write(max98396->regmap,
 		     MAX98396_R2044_PCM_TX_CTRL_1,
