@@ -110,6 +110,8 @@ struct cs2000_priv {
 	bool lf_ratio;
 	bool clk_skip;
 
+	unsigned int pll_lock_timeout_ms;
+
 	/* suspend/resume */
 	unsigned long saved_rate;
 	unsigned long saved_parent_rate;
@@ -171,21 +173,16 @@ static int cs2000_ref_clk_bound_rate(struct cs2000_priv *priv,
 static int cs2000_wait_pll_lock(struct cs2000_priv *priv)
 {
 	struct device *dev = priv_to_dev(priv);
-	unsigned int i, val;
+	unsigned int val;
 	int ret;
 
-	for (i = 0; i < 256; i++) {
-		ret = regmap_read(priv->regmap, DEVICE_CTRL, &val);
-		if (ret < 0)
-			return ret;
-		if (!(val & PLL_UNLOCK))
-			return 0;
-		udelay(1);
-	}
+	ret = regmap_read_poll_timeout(priv->regmap, DEVICE_CTRL, val,
+				       !(val & PLL_UNLOCK), USEC_PER_MSEC,
+				       priv->pll_lock_timeout_ms * USEC_PER_MSEC);
+	if (ret < 0)
+		dev_err(dev, "pll lock failed\n");
 
-	dev_err(dev, "pll lock failed\n");
-
-	return -ETIMEDOUT;
+	return ret;
 }
 
 static int cs2000_clk_out_enable(struct cs2000_priv *priv, bool enable)
@@ -480,6 +477,10 @@ static int cs2000_clk_register(struct cs2000_priv *priv)
 				 AUXOUTSRC_MASK, AUXOUTSRC(aux_out));
 	if (ret < 0)
 		return ret;
+
+	priv->pll_lock_timeout_ms = 100;
+	of_property_read_u32(np, "cirrus,pll-lock-timeout-ms",
+			     &priv->pll_lock_timeout_ms);
 
 	priv->clk_skip = of_property_read_bool(np, "cirrus,clock-skip");
 
