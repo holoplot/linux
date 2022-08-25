@@ -62,6 +62,11 @@ properties:
       output signal directly from the REF_CLK input.
     $ref: /schemas/types.yaml#/definitions/flag
 
+  cirrus,pll-lock-timeout-ms:
+    description:
+      Specifies the maximum time to wait for the PLL to lock, in milliseconds.
+    default: 100
+
 required:
   - compatible
   - reg
