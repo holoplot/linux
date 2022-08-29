@@ -1567,6 +1567,9 @@ static int max98396_probe(struct snd_soc_component *component)
 			max98396->dmon_mag_threshold);
 	}
 
+	/* Maximum output level */
+	regmap_update_bits(max98396->regmap, MAX98396_R2091_AMP_PATH_GAIN, 0x1f, 0x11);
+
 	/* Speaker Amplifier PCM RX Enable by default */
 	regmap_update_bits(max98396->regmap,
 			   MAX98396_R205E_PCM_RX_EN,
