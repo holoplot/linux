@@ -2028,6 +2028,7 @@ static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 	struct mv88e6xxx_chip *chip = ds->priv;
 	struct mv88e6xxx_vtu_entry vlan;
 	int err;
+	u16 fid;
 
 	/* DSA and CPU ports have to be members of multiple vlans */
 	if (dsa_port_is_dsa(dp) || dsa_port_is_cpu(dp))
@@ -2037,11 +2038,16 @@ static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 	if (err)
 		return err;
 
+	err = mv88e6xxx_port_get_fid(chip, port, &fid);
+	if (err)
+		return err;
+
 	if (!vlan.valid)
 		return 0;
 
 	dsa_switch_for_each_user_port(other_dp, ds) {
 		struct net_device *other_br;
+		u16 other_fid;
 
 		if (vlan.member[other_dp->index] ==
 		    MV88E6XXX_G1_VTU_DATA_MEMBER_TAG_NON_MEMBER)
@@ -2052,6 +2058,10 @@ static int mv88e6xxx_port_check_hw_vlan(struct dsa_switch *ds, int port,
 
 		other_br = dsa_port_bridge_dev_get(other_dp);
 		if (!other_br)
+			continue;
+
+		err = mv88e6xxx_port_get_fid(chip, other_dp->index, &other_fid);
+		if (err == 0 && fid != other_fid)
 			continue;
 
 		dev_err(ds->dev, "p%d: hw VLAN %d already used by port %d in %s\n",
@@ -2947,6 +2957,11 @@ static int mv88e6xxx_port_bridge_join(struct dsa_switch *ds, int port,
 
 		*tx_fwd_offload = true;
 	}
+
+	/* Set the port's FID to the bridge index so bridges can have
+	 * overlapping VLANs.
+	 */
+	err = mv88e6xxx_port_set_fid(chip, port, bridge.num);
 
 unlock:
 	mv88e6xxx_reg_unlock(chip);
