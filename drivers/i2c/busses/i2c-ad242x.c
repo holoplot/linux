@@ -147,6 +147,26 @@ static int ad242x_i2c_probe(struct platform_device *pdev)
 	dev_info(dev, "ad242x i2c driver, node ID %d\n", node->id);
 	platform_set_drvdata(pdev, i2c);
 
+	/*
+	 * Terrible hack: do an i2c scan of the downstream bus to unblock
+	 * hardware communication.
+	 */
+	if (true) {
+		struct i2c_msg msgs[128];
+		int i;
+
+		for (i = 0; i < ARRAY_SIZE(msgs); i++) {
+			msgs[i].addr = i;
+			msgs[i].flags = I2C_M_RD;
+			msgs[i].len = 0;
+			msgs[i].buf = NULL;
+		}
+
+		ret = ad242x_i2c_xfer(&i2c->adap, msgs, ARRAY_SIZE(msgs));
+		if (ret < 0)
+			dev_err(dev, "I2C scan failed: %d\n", ret);
+	}
+
 	return 0;
 }
 
