@@ -2547,7 +2547,8 @@ EXPORT_SYMBOL_GPL(snd_soc_add_dai_controls);
  */
 int snd_soc_register_card(struct snd_soc_card *card)
 {
-	int ret;
+	struct snd_soc_dai_link *dai_link;
+	int ret, i;
 
 	if (!card->name || !card->dev)
 		return -EINVAL;
@@ -2579,6 +2580,14 @@ int snd_soc_register_card(struct snd_soc_card *card)
 		}
 	} else {
 		ret = snd_soc_bind_card(card);
+	}
+
+	/* REMOVE ME */
+	for_each_card_prelinks(card, i, dai_link) {
+		if (!dai_link->c2c_params) {
+			dai_link->c2c_params	 = dai_link->params;
+			dai_link->num_c2c_params = dai_link->num_params;
+		}
 	}
 
 	mutex_unlock(&client_mutex);
