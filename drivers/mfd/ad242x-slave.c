@@ -85,14 +85,19 @@ static int ad242x_slave_regmap_write(void *context, unsigned int reg,
 }
 
 static const struct regmap_config ad242x_regmap_config = {
-	.reg_bits	= 8,
-	.val_bits	= 8,
-	.volatile_reg	= ad242x_is_volatile_reg,
-	.writeable_reg	= ad242x_is_writeable_reg,
-	.reg_read	= ad242x_slave_regmap_read,
-	.reg_write	= ad242x_slave_regmap_write,
-	.max_register	= AD242X_MAX_REG,
-	.cache_type	= REGCACHE_RBTREE,
+	.reg_bits		= 8,
+	.val_bits		= 8,
+	.volatile_reg		= ad242x_is_volatile_reg,
+	.writeable_reg		= ad242x_is_writeable_reg,
+	.reg_read		= ad242x_slave_regmap_read,
+	.reg_write		= ad242x_slave_regmap_write,
+	.max_register		= AD242X_MAX_REG,
+	.cache_type		= REGCACHE_RBTREE,
+	/*
+	 * This regmap is either used by a single master during
+	 * probe, or is protected by the ad242x_i2c's adapter lock.
+	 */
+	.disable_locking	= true,
 };
 
 static int ad242x_calc_sync_offset(unsigned int val)
