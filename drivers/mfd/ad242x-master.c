@@ -479,7 +479,6 @@ static int ad242x_master_probe(struct i2c_client *i2c)
 		return -ENOMEM;
 
 	mutex_init(&master->mutex);
-	mutex_init(&master->bus.mutex);
 	init_completion(&master->run_completion);
 	init_completion(&master->discover_completion);
 	dev_set_drvdata(dev, &master->node);

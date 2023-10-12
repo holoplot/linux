@@ -26,23 +26,17 @@ int ad242x_slave_read(struct ad242x_i2c_bus *bus,
 {
 	int ret;
 
-	mutex_lock(&bus->mutex);
-
 	ret = regmap_write(master_regmap, AD242X_NODEADR, node_id);
 	if (ret < 0)
-		goto err_unlock;
+		return ret;
 
 	ret = i2c_smbus_read_byte_data(bus->client, reg);
 	if (ret < 0)
-		goto err_unlock;
+		return ret;
 
 	*val = ret;
-	ret = 0;
 
-err_unlock:
-	mutex_unlock(&bus->mutex);
-
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(ad242x_slave_read);
 
@@ -52,22 +46,15 @@ int ad242x_slave_write(struct ad242x_i2c_bus *bus,
 {
 	int ret;
 
-	mutex_lock(&bus->mutex);
-
 	ret = regmap_write(master_regmap, AD242X_NODEADR, node_id);
 	if (ret < 0)
-		goto err_unlock;
+		return ret;
 
 	ret = i2c_smbus_write_byte_data(bus->client, reg, val);
 	if (ret < 0)
-		goto err_unlock;
+		return ret;
 
-	ret = 0;
-
-err_unlock:
-	mutex_unlock(&bus->mutex);
-
-	return ret;
+	return 0;
 }
 EXPORT_SYMBOL_GPL(ad242x_slave_write);
 
