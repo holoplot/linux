@@ -23,7 +23,6 @@ static int ad242x_set_addr(struct ad242x_node *mnode,
 			   uint8_t node_id, uint8_t addr)
 {
 	int ret;
-	uint8_t buf[2] = { AD242X_CHIP, addr };
 
 	ret = regmap_update_bits(mnode->regmap, AD242X_NODEADR,
 				 AD242X_NODEADR_PERI | AD242X_NODEADR_MASK,
@@ -31,12 +30,7 @@ static int ad242x_set_addr(struct ad242x_node *mnode,
 	if (ret < 0)
 		return ret;
 
-	/*
-	 * We can't use the slave's regmap here as it holds the same
-	 * lock we also need to guard this context.
-	 */
-	ret = i2c_transfer_buffer_flags(bus->client,
-					buf, sizeof(buf), 0);
+	ret = i2c_smbus_write_byte_data(bus->client, AD242X_CHIP, addr);
 	if (ret < 0)
 		return ret;
 
@@ -51,8 +45,6 @@ static int ad242x_i2c_xfer(struct i2c_adapter *adap,
 	struct ad242x_i2c_bus *bus = ad242x_master_get_bus(i2c->node->master);
 	struct ad242x_node *mnode = ad242x_master_get_node(i2c->node->master);
 	int ret, i, current_addr = -1;
-
-	mutex_lock(&bus->mutex);
 
 	for (i = 0; i < num; i++) {
 		struct i2c_msg *msg = msgs + i;
@@ -74,8 +66,6 @@ static int ad242x_i2c_xfer(struct i2c_adapter *adap,
 		if (ret < 0)
 			break;
 	}
-
-	mutex_unlock(&bus->mutex);
 
 	return ret < 0 ? ret : num;
 }

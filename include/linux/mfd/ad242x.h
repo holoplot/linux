@@ -356,7 +356,6 @@ struct ad242x_master;
 
 struct ad242x_i2c_bus {
 	struct i2c_client	*client;
-	struct mutex		mutex;
 };
 
 struct ad242x_node {
