@@ -21,7 +21,6 @@ struct ad242x_master {
 	struct completion	discover_completion;
 	struct ad242x_i2c_bus	bus;
 	struct irq_domain	*irq_domain;
-	struct mutex		mutex;
 	unsigned int		irq_mask;
 	unsigned int		up_slot_size;
 	unsigned int		dn_slot_size;
@@ -146,9 +145,7 @@ static irqreturn_t ad242x_handle_irq(int irq, void *dev_id)
 {
 	struct ad242x_master *master = dev_id;
 
-	mutex_lock(&master->mutex);
 	ad242x_read_irqs(master);
-	mutex_unlock(&master->mutex);
 
 	return IRQ_HANDLED;
 }
@@ -478,7 +475,6 @@ static int ad242x_master_probe(struct i2c_client *i2c)
 	if (!master)
 		return -ENOMEM;
 
-	mutex_init(&master->mutex);
 	init_completion(&master->run_completion);
 	init_completion(&master->discover_completion);
 	dev_set_drvdata(dev, &master->node);
