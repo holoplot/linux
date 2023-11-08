@@ -216,7 +216,7 @@ static int ad242x_gpio_set_irq_type(struct irq_data *irq_data,
 	return 0;
 }
 
-static void ad242x_gpio_bus_lock(struct irq_data *irq_data)
+static void ad242x_gpio_irq_bus_lock(struct irq_data *irq_data)
 {
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(irq_data);
 	struct ad242x_gpio *ad242x_gpio = gpiochip_get_data(gc);
@@ -312,7 +312,7 @@ static int ad242x_gpio_irq_init(struct device *dev,
 	ic->irq_mask = ad242x_gpio_irq_mask;
 	ic->irq_unmask = ad242x_gpio_irq_unmask;
 	ic->irq_set_type = ad242x_gpio_set_irq_type;
-	ic->irq_bus_lock = ad242x_gpio_bus_lock,
+	ic->irq_bus_lock = ad242x_gpio_irq_bus_lock,
 	ic->irq_bus_sync_unlock = ad242x_gpio_bus_sync_unlock,
 
 	gc->irq.chip = ic;
