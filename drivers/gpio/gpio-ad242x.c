@@ -20,6 +20,7 @@ struct ad242x_gpio {
 	struct gpio_chip chip;
 	struct irq_chip irq_chip;
 	struct mutex irq_buslock;
+	struct mutex lock;
 	u8 irq_mask, irq_inv;
 	u32 gpio_od_mask;
 };
@@ -263,26 +264,22 @@ static irqreturn_t ad242x_gpio_irq_handler(int irq, void *dev_id)
 	struct gpio_chip *gc = &ad242x_gpio->chip;
 	struct device *dev = gc->parent;
 	unsigned int val, index;
+	int ret = IRQ_NONE;
 	u8 inttype;
-	int ret;
 
 	inttype = ad242x_node_inttype(ad242x_gpio->node);
 
 	if (inttype < AD242X_INTTYPE_IO0PND || inttype > AD242X_INTTYPE_IO7PND)
-		return IRQ_NONE;
+		return ret;
 
 	index = inttype - AD242X_INTTYPE_IO0PND;
+
+	mutex_lock(&ad242x_gpio->lock);
 
 	ret = regmap_read(regmap, AD242X_INTPND1, &val);
 	if (ret < 0) {
 		dev_err(dev, "Failed to read pending IRQs: %d\n", ret);
-		return IRQ_NONE;
-	}
-
-	ret = regmap_write(regmap, AD242X_INTPND1, val);
-	if (ret < 0) {
-		dev_err(dev, "Failed to clear IRQs: %d\n", ret);
-		return IRQ_NONE;
+		goto out_unlock;
 	}
 
 	if (!(ad242x_gpio->irq_mask & BIT(irq))) {
@@ -291,7 +288,17 @@ static irqreturn_t ad242x_gpio_irq_handler(int irq, void *dev_id)
 		handle_nested_irq(virq);
 	}
 
-	return IRQ_HANDLED;
+	ret = regmap_write(regmap, AD242X_INTPND1, val);
+	if (ret < 0) {
+		dev_err(dev, "Failed to clear IRQs: %d\n", ret);
+	}
+
+	ret = IRQ_HANDLED;
+
+out_unlock:
+	mutex_unlock(&ad242x_gpio->lock);
+
+	return ret;
 }
 
 static int ad242x_gpio_irq_init(struct device *dev,
@@ -320,6 +327,7 @@ static int ad242x_gpio_irq_init(struct device *dev,
 	gc->irq.handler = handle_edge_irq;
 
 	mutex_init(&ad242x_gpio->irq_buslock);
+	mutex_init(&ad242x_gpio->lock);
 	ad242x_gpio->irq_mask = 0xff;
 
 	ret = devm_request_threaded_irq(dev, irq,
