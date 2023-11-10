@@ -107,6 +107,55 @@ static int ad242x_read_one_irq(struct ad242x_master *master)
 	else
 		node_id = 16;
 
+	/* Error interrupts */
+	ret = regmap_read(regmap, AD242X_INTPND0, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val & AD242X_INTPDN0_HDCNTERR)
+		dev_err(dev, "Header Count Error\n");
+
+	if (val & AD242X_INTPDN0_DDERR)
+		dev_err(dev, "Data Decoding Error\n");
+
+	if (val & AD242X_INTPDN0_CRCERR)
+		dev_err(dev, "CRC Error\n");
+
+	if (val & AD242X_INTPDN0_DPERR)
+		dev_err(dev, "Data Parity Error\n");
+
+	if (val & AD242X_INTPDN0_PWRERR)
+		dev_err(dev, "Downstream Power Switch Error\n");
+
+	if (val & AD242X_INTPDN0_BECOVF)
+		dev_err(dev, "Bit Error Count Error\n");
+
+	if (val & AD242X_INTPDN0_SRFERR)
+		dev_err(dev, "SRF Miss Error\n");
+
+	if (val & AD242X_INTPDN0_SRFCRCERR)
+		dev_err(dev, "SRF CRC Error\n");
+
+	ret = regmap_write(regmap, AD242X_INTPND0, val);
+	if (ret < 0)
+		return ret;
+
+	/* PND2 */
+	ret = regmap_read(regmap, AD242X_INTPND2, &val);
+	if (ret < 0)
+		return ret;
+
+	if (val & AD242X_INTPND2_I2CERR)
+		dev_err(dev, "I2C Transaction Error");
+
+	if (val & AD242X_INTPND2_ICRCERR)
+		dev_err(dev, "Interrupt Frame CRC Error");
+
+	ret = regmap_write(regmap, AD242X_INTPND2, val);
+	if (ret < 0)
+		return ret;
+
+	/* Handle relevant interrupts */
 	ret = regmap_read(regmap, AD242X_INTTYPE, &inttype);
 	if (ret < 0)
 		return ret;
