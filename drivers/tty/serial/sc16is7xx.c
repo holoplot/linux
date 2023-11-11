@@ -759,6 +759,8 @@ static bool sc16is7xx_port_irq(struct sc16is7xx_port *s, int portno)
 
 		iir &= SC16IS7XX_IIR_ID_MASK;
 
+		dev_dbg(port->dev, "iir = %d\n", iir);
+
 		switch (iir) {
 		case SC16IS7XX_IIR_RDI_SRC:
 		case SC16IS7XX_IIR_RLSE_SRC:
@@ -792,9 +794,14 @@ static irqreturn_t sc16is7xx_irq(int irq, void *dev_id)
 
 	mutex_lock(&s->efr_lock);
 
+	int c = 0;
+
 	while (1) {
 		bool keep_polling = false;
 		int i;
+
+		dev_dbg(s->p[0].port.dev, "c = %d\n", c);
+		c++;
 
 		for (i = 0; i < s->devtype->nr_uart; ++i)
 			keep_polling |= sc16is7xx_port_irq(s, i);
