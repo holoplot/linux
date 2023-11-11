@@ -160,6 +160,8 @@ static int ad242x_read_one_irq(struct ad242x_master *master)
 	if (ret < 0)
 		return ret;
 
+	dev_dbg(dev, "inttype 0x%02x node_id %d\n", inttype, node_id);
+
 	switch (inttype) {
 	case AD242X_INTTYPE_DSCDONE:
 		complete(&master->discover_completion);
@@ -179,9 +181,13 @@ static int ad242x_read_irqs(struct ad242x_master *master)
 {
 	int ret;
 	bool first = true;
+	struct device *dev = master->node.dev;
+	int i = 0;
 
 	while (true) {
 		ret = ad242x_read_one_irq(master);
+		dev_dbg(dev, "ad242x_read_one_irq() ret %d, i %d\n", ret, i);
+		i++;
 		if (ret < 0)
 			return ret;
 		if (ret == -ENOENT)
