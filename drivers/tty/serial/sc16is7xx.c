@@ -745,31 +745,6 @@ static void sc16is7xx_update_mlines(struct sc16is7xx_one *one)
 	spin_unlock_irqrestore(&port->lock, flags);
 }
 
-static int sc16is7xx_read_iir(struct uart_port *port)
-{
-	unsigned int iir;
-
-	iir = sc16is7xx_port_read(port, SC16IS7XX_IIR_REG);
-	if (iir & SC16IS7XX_IIR_NO_INT_BIT)
-		return 0;
-
-	return iir & SC16IS7XX_IIR_ID_MASK;
-}
-
-static void sc16is7xx_reset(struct sc16is7xx_port *s)
-{
-	regcache_cache_bypass(s->regmap, true);
-	regmap_write(s->regmap,
-		     SC16IS7XX_IOCONTROL_REG << SC16IS7XX_REG_SHIFT,
-		     SC16IS7XX_IOCONTROL_SRESET_BIT);
-	regcache_cache_bypass(s->regmap, false);
-
-	udelay(USEC_PER_MSEC);
-
-	regcache_mark_dirty(s->regmap);
-	regcache_sync(s->regmap);
-}
-
 static bool sc16is7xx_port_irq(struct sc16is7xx_port *s, int portno)
 {
 	struct uart_port *port = &s->p[portno].port;
@@ -778,9 +753,11 @@ static bool sc16is7xx_port_irq(struct sc16is7xx_port *s, int portno)
 		unsigned int iir, rxlen;
 		struct sc16is7xx_one *one = to_sc16is7xx_one(port, port);
 
-		iir = sc16is7xx_read_iir(port);
-		if (!iir)
+		iir = sc16is7xx_port_read(port, SC16IS7XX_IIR_REG);
+		if (iir & SC16IS7XX_IIR_NO_INT_BIT)
 			return false;
+
+		iir &= SC16IS7XX_IIR_ID_MASK;
 
 		dev_dbg(port->dev, "iir = %d\n", iir);
 
@@ -806,25 +783,6 @@ static bool sc16is7xx_port_irq(struct sc16is7xx_port *s, int portno)
 					    "ttySC%i: Unexpected interrupt: %x",
 					    port->line, iir);
 			break;
-		}
-
-		if (iir == SC16IS7XX_IIR_RTOI_SRC) {
-			/*
-			 * If the IIR register still signals a timeout after
-			 * a FIFO read was attempted, we triggered a silicon
-			 * bug that is described in Errata for Rev. E (18.1.4).
-			 *
-			 * Reset the device in this case.
-			 */
-			iir = sc16is7xx_read_iir(port);
-			if (!iir)
-				return false;
-
-			if (iir == SC16IS7XX_IIR_RTOI_SRC) {
-				dev_err_ratelimited(port->dev,
-						    "timeout IRQ stuck\n");
-				sc16is7xx_reset(s);
-			}
 		}
 	} while (0);
 	return true;
