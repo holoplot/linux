@@ -351,6 +351,7 @@ static unsigned long sc16is7xx_lines;
 
 static struct uart_driver sc16is7xx_uart = {
 	.owner		= THIS_MODULE,
+	.driver_name    = SC16IS7XX_NAME,
 	.dev_name	= "ttySC",
 	.nr		= SC16IS7XX_MAX_DEVS,
 };
