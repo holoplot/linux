@@ -85,3 +85,22 @@ int a2b_node_write(struct a2b_node *node, uint8_t reg, uint8_t val)
 	else
 		return a2b_subnode_write(a2b_node_to_subnode(node), reg, val);
 }
+
+int a2b_node_update_bits(struct a2b_node *node, uint8_t reg,
+			 uint8_t mask, uint8_t val)
+{
+	unsigned int v;
+	int ret;
+
+	if (node->id == A2B_MAIN_NODE_ID)
+		return regmap_update_bits(node->regmap, reg, mask, val);
+
+	ret = a2b_subnode_read(a2b_node_to_subnode(node), reg, &v);
+	if (ret)
+		return ret;
+
+	v &= ~mask;
+	v |= val & mask;
+
+	return a2b_subnode_write(a2b_node_to_subnode(node), reg, v);
+}

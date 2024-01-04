@@ -280,7 +280,10 @@ struct regmap *a2b_subnode_regmap_init(struct a2b_subnode *subnode,
 
 int a2b_node_read(struct a2b_node *node, uint8_t reg);
 int a2b_node_write(struct a2b_node *node, uint8_t reg, uint8_t val);
+int a2b_node_update_bits(struct a2b_node *node, uint8_t reg,
+			 uint8_t mask, uint8_t val);
 
+int a2b_request_irq(struct a2b_mainnode *mainnode);
 int a2b_init_irq(struct a2b_mainnode *mainnode);
 int a2b_wait_for_irq(struct a2b_mainnode *mainnode,
 		     struct completion *completion, unsigned int timeout);

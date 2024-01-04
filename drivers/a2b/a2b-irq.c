@@ -61,7 +61,7 @@ static int a2b_read_one_irq(struct a2b_mainnode *mainnode)
 			return ret;
 	}
 
-	dev_dbg(dev, "%s() inttype: 0x%02x intsrc: 0x%02x \n", __func__,
+	dev_err(dev, "%s() inttype: 0x%02x intsrc: 0x%02x \n", __func__,
 		inttype, intsrc);
 
 	switch (inttype) {
@@ -123,24 +123,27 @@ int a2b_wait_for_irq(struct a2b_mainnode *mainnode,
 	return ret == 0 ? -ETIMEDOUT : 0;
 }
 
+int a2b_request_irq(struct a2b_mainnode *mainnode)
+{
+	struct device *dev = &mainnode->node.dev;
+
+	if (mainnode->irq <= 0)
+		return 0;
+
+	return devm_request_threaded_irq(dev, mainnode->irq, NULL,
+					 a2b_handle_irq, IRQF_ONESHOT,
+					 dev_name(dev), mainnode);
+}
+
 int a2b_init_irq(struct a2b_mainnode *mainnode)
 {
 	struct regmap *regmap = mainnode->node.regmap;
-	struct device *dev = &mainnode->node.dev;
 	int ret;
 
-	if (mainnode->irq > 0) {
-		ret = devm_request_threaded_irq(dev, mainnode->irq, NULL,
-						a2b_handle_irq, IRQF_ONESHOT,
-						dev_name(dev), mainnode);
-		if (ret < 0)
-			return ret;
-	}
-
 	ret = regmap_write(regmap, A2B_INTMSK0,
-			   A2B_INTMSK0_SRFEIEN | A2B_INTMSK0_BECIEN |
-				   A2B_INTMSK0_PWREIEN | A2B_INTMSK0_CRCEIEN |
-				   A2B_INTMSK0_DDEIEN | A2B_INTMSK0_HCEIEN);
+			   A2B_INTMSK0_SRFEIEN | A2B_INTMSK0_BECIEN  |
+			   A2B_INTMSK0_PWREIEN | A2B_INTMSK0_CRCEIEN |
+			   A2B_INTMSK0_DDEIEN  | A2B_INTMSK0_HCEIEN);
 	if (ret < 0)
 		return ret;
 

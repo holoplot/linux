@@ -426,7 +426,8 @@ static int a2b_node_set_transceiver_config(struct a2b_node *node)
 	else
 		val = 0;
 
-	return a2b_node_write(node, A2B_CONTROL, val);
+	return a2b_node_update_bits(node, A2B_CONTROL,
+				    A2B_CONTROL_XCVRBINV, val);
 }
 
 static int a2b_node_set_pin_config(struct a2b_node *node)
@@ -680,16 +681,24 @@ static int a2b_mainnode_startup(struct a2b_mainnode *mainnode)
 		return ret;
 	}
 
+	ret = a2b_request_irq(mainnode);
+	if (ret)
+		return ret;
+
 	ret = regmap_write(regmap, A2B_CONTROL,
 			   A2B_CONTROL_MSTR | A2B_CONTROL_SOFTRST);
 	if (ret < 0)
 		return ret;
 
-	ret = a2b_wait_for_irq(mainnode, &mainnode->run_completion, 10);
+	ret = a2b_wait_for_irq(mainnode, &mainnode->run_completion, 100);
 	if (ret < 0) {
 		dev_err(dev, "timeout waiting for PLL sync: %d\n", ret);
 		return ret;
 	}
+
+	ret = a2b_init_irq(mainnode);
+	if (ret)
+		return ret;
 
 	ret = regmap_update_bits(regmap, A2B_CONTROL, A2B_CONTROL_SOFTRST, 0);
 	if (ret)
@@ -700,10 +709,6 @@ static int a2b_mainnode_startup(struct a2b_mainnode *mainnode)
 		return ret;
 
 	ret = a2b_node_set_pin_config(&mainnode->node);
-	if (ret)
-		return ret;
-
-	ret = a2b_init_irq(mainnode);
 	if (ret)
 		return ret;
 
@@ -723,8 +728,6 @@ static void a2b_mainnode_unregister(struct a2b_mainnode *mainnode)
 	mfd_remove_devices(&mainnode->node.dev);
 	device_for_each_child(&mainnode->node.dev, NULL,
 			      a2b_unregister_subnodes);
-
-	i2c_unregister_device(mainnode->bus_client);
 	regmap_exit(mainnode->node.regmap);
 	mainnode->node.regmap = NULL;
 
@@ -761,7 +764,7 @@ a2b_mainnode_register(struct i2c_client *parent,
 	}
 
 	/*
-	 * The A2B deviecs consume two I2C addresses on the bus:
+	 * The A2B devices consume two I2C addresses on the bus:
 	 * b1101xx0: The I2C address for the local device
 	 * b1101xx1: The I2C address to send transactions out on the A2B bus
 	 *
@@ -771,9 +774,8 @@ a2b_mainnode_register(struct i2c_client *parent,
 	mainnode->bus_client = devm_i2c_new_dummy_device(&parent->dev,
 							 parent->adapter,
 							 parent->addr | 0x1);
-	if (!mainnode->bus_client) {
-		dev_err(&parent->dev, "Failed to allocate bus I2C client\n");
-		ret = -EBUSY;
+	if (IS_ERR(mainnode->bus_client)) {
+		ret = PTR_ERR(mainnode->bus_client);
 		goto err_regmap_exit;
 	}
 
