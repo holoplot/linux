@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config SND_SOC_HOLOPLOT_PCM
+	tristate "Holoplot PCM"
+	select SND_SOC_GENERIC_DMAENGINE_PCM
+	help
+	  Say Y or M if you want to add support for DMA backed PCN support for
+	  Holoplot device. If in doubt, say N.
