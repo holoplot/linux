@@ -1705,15 +1705,18 @@ static int xilinx_dma_device_config(struct dma_chan *dchan,
  * xilinx_dma_complete_descriptor - Mark the active descriptor as complete
  * @chan : xilinx DMA channel
  *
+ * Returns the number of completed descriptiors.
+ *
  * CONTEXT: hardirq
  */
-static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
+static int xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
 {
 	struct xilinx_dma_tx_descriptor *desc, *next;
+	int count = 0;
 
 	/* This function was invoked with lock held */
 	if (list_empty(&chan->active_list))
-		return;
+		return count;
 
 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
 		if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
@@ -1732,10 +1735,14 @@ static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
 		desc->err = chan->err;
 
 		list_del(&desc->node);
-		if (!desc->cyclic)
+		if (!desc->cyclic) {
 			dma_cookie_complete(&desc->async_tx);
+			count++;
+		}
 		list_add_tail(&desc->node, &chan->done_list);
 	}
+
+	return count;
 }
 
 /**
@@ -1908,9 +1915,10 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
 	if (status & (XILINX_DMA_DMASR_FRM_CNT_IRQ |
 		      XILINX_DMA_DMASR_DLY_CNT_IRQ)) {
 		spin_lock(&chan->lock);
-		xilinx_dma_complete_descriptor(chan);
-		chan->idle = true;
-		chan->start_transfer(chan);
+		if (xilinx_dma_complete_descriptor(chan) > 0) {
+			chan->idle = true;
+			chan->start_transfer(chan);
+		}
 		spin_unlock(&chan->lock);
 	}
 
