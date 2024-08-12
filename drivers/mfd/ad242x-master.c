@@ -77,7 +77,9 @@ static void ad242x_handle_node_irq(struct ad242x_master *master, u8 node_id)
 		return;
 
 	virq = irq_find_mapping(master->irq_domain, node_id);
-	handle_nested_irq(virq);
+
+	if (virq)
+		handle_nested_irq(virq);
 }
 
 static int ad242x_read_one_irq(struct ad242x_master *master)
