@@ -26,7 +26,6 @@ struct dummy_net_priv {
 	struct phylink_config	phylink_config;
 };
 
-/* fake multicast ability */
 static void dummy_set_multicast_list(struct net_device *dev)
 {
 }
@@ -40,13 +39,7 @@ static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 
 static int dummy_dev_init(struct net_device *dev)
 {
-	netdev_lockdep_set_classes(dev);
 	return 0;
-}
-
-static void dummy_dev_uninit(struct net_device *dev)
-{
-	free_percpu(dev->lstats);
 }
 
 static int dummy_change_carrier(struct net_device *dev, bool new_carrier)
@@ -64,8 +57,6 @@ static int dummy_net_open(struct net_device *ndev)
 	struct dummy_net_priv *priv = netdev_priv(ndev);
 	struct device *dev = priv->dev;
 	int ret;
-
-	printk(KERN_ERR "XXXXX %s() dev %px ndev %px priv %px\n", __func__, dev, ndev, priv);
 
 	ret = phylink_of_phy_connect(priv->phylink, dev->of_node, 0);
 	if (ret) {
@@ -94,7 +85,6 @@ static const struct net_device_ops dummy_netdev_ops = {
 	.ndo_init		= dummy_dev_init,
 	.ndo_open		= dummy_net_open,
 	.ndo_stop		= dummy_net_stop,
-	.ndo_uninit		= dummy_dev_uninit,
 	.ndo_start_xmit		= dummy_xmit,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_set_rx_mode	= dummy_set_multicast_list,
@@ -212,8 +202,6 @@ static int dummy_net_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	printk(KERN_ERR "XXXXX %s() dev %px ndev %px priv %px\n", __func__, dev, ndev, priv);
-
 	return 0;
 }
 
@@ -234,5 +222,5 @@ static struct platform_driver dummy_net_driver =
 
 module_platform_driver(dummy_net_driver);
 
-MODULE_DESCRIPTION("Daten dummy net driver");
+MODULE_DESCRIPTION("Dante dummy net driver");
 MODULE_LICENSE("GPL");
