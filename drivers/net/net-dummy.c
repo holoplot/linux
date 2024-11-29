@@ -136,9 +136,11 @@ static const struct phylink_mac_ops dummy_net_phylink_ops = {
 static int dummy_net_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
 	struct dummy_net_priv *priv;
 	struct net_device *ndev;
 	phy_interface_t phy_mode;
+	const char *prefix;
 	int ret;
 
 	ndev = devm_alloc_etherdev(dev, sizeof(*priv));
@@ -149,9 +151,13 @@ static int dummy_net_probe(struct platform_device *pdev)
 	priv->dev = dev;
 	priv->ndev = ndev;
 
-	platform_set_drvdata(pdev, ndev);
+	ret = of_property_read_string(np, "link-name-prefix", &prefix);
+	if (ret)
+		return ret;
 
-	strcpy(ndev->name, "da%d");
+	snprintf(ndev->name, sizeof(ndev->name), "%s%%d", prefix);
+
+	platform_set_drvdata(pdev, ndev);
 	SET_NETDEV_DEV(ndev, dev);
 
 	ether_setup(ndev);
@@ -206,7 +212,7 @@ static int dummy_net_probe(struct platform_device *pdev)
 }
 
 static const struct of_device_id dummy_net_of_ids[] = {
-	{ .compatible = "holoplot,dante-dummy" },
+	{ .compatible = "holoplot,dummy-net" },
 	{}
 };
 MODULE_DEVICE_TABLE(of, dummy_net_of_ids);
