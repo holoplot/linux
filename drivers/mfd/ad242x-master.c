@@ -325,10 +325,10 @@ static int ad242x_discover(struct ad242x_master *master,
 		}
 
 		/* See section 3-18 in the datasheet */
-		slave_dn_slots = max_t(int, slot_config.dn_n_forward_slots,
-				       fls(slot_config.dn_rx_slots));
-		slave_up_slots = max_t(int, slot_config.up_n_forward_slots,
-				       slot_config.up_n_tx_slots);
+		slave_dn_slots = slot_config.dn_n_forward_slots +
+				 fls(slot_config.dn_rx_slots);
+		slave_up_slots = slot_config.up_n_forward_slots +
+				 slot_config.up_n_tx_slots;
 
 		if (n == 0) {
 			master_up_slots = slave_up_slots;
