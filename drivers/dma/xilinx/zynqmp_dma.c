@@ -357,7 +357,7 @@ static void zynqmp_dma_init(struct zynqmp_dma_chan *chan)
 	val = readl(chan->regs + ZYNQMP_DMA_IRQ_SRC_ACCT);
 	val = readl(chan->regs + ZYNQMP_DMA_IRQ_DST_ACCT);
 
-	chan->idle = true;
+	WRITE_ONCE(chan->idle, true);
 }
 
 /**
@@ -514,7 +514,7 @@ static void zynqmp_dma_start(struct zynqmp_dma_chan *chan)
 {
 	writel(ZYNQMP_DMA_INT_EN_DEFAULT_MASK, chan->regs + ZYNQMP_DMA_IER);
 	writel(0, chan->regs + ZYNQMP_DMA_TOTAL_BYTE);
-	chan->idle = false;
+	WRITE_ONCE(chan->idle, false);
 	writel(ZYNQMP_DMA_ENABLE, chan->regs + ZYNQMP_DMA_CTRL2);
 }
 
@@ -579,7 +579,7 @@ static void zynqmp_dma_start_transfer(struct zynqmp_dma_chan *chan)
 {
 	struct zynqmp_dma_desc_sw *desc;
 
-	if (!chan->idle)
+	if (WARN_ON(!READ_ONCE(chan->idle)))
 		return;
 
 	zynqmp_dma_config(chan);
@@ -729,7 +729,7 @@ static irqreturn_t zynqmp_dma_irq_handler(int irq, void *data)
 	}
 
 	if (status & ZYNQMP_DMA_DONE)
-		chan->idle = true;
+		WRITE_ONCE(chan->idle, true);
 
 	if (status & ZYNQMP_DMA_INT_ERR) {
 		chan->err = true;
@@ -773,7 +773,7 @@ static void zynqmp_dma_do_tasklet(struct tasklet_struct *t)
 
 	zynqmp_dma_chan_desc_cleanup(chan);
 
-	if (chan->idle) {
+	if (READ_ONCE(chan->idle)) {
 		spin_lock_irqsave(&chan->lock, irqflags);
 		zynqmp_dma_start_transfer(chan);
 		spin_unlock_irqrestore(&chan->lock, irqflags);
