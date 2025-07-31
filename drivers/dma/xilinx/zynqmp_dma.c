@@ -757,7 +757,7 @@ static void zynqmp_dma_do_tasklet(struct tasklet_struct *t)
 	u32 count;
 	unsigned long irqflags;
 
-	if (chan->err) {
+	if (WARN_ON(chan->err)) {
 		zynqmp_dma_reset(chan);
 		chan->err = false;
 		return;
@@ -773,11 +773,12 @@ static void zynqmp_dma_do_tasklet(struct tasklet_struct *t)
 
 	zynqmp_dma_chan_desc_cleanup(chan);
 
-	if (READ_ONCE(chan->idle)) {
-		spin_lock_irqsave(&chan->lock, irqflags);
+	spin_lock_irqsave(&chan->lock, irqflags);
+
+	if (READ_ONCE(chan->idle))
 		zynqmp_dma_start_transfer(chan);
-		spin_unlock_irqrestore(&chan->lock, irqflags);
-	}
+
+	spin_unlock_irqrestore(&chan->lock, irqflags);
 }
 
 /**
