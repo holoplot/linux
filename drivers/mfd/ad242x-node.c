@@ -131,6 +131,9 @@ int ad242x_node_probe(struct ad242x_node *node)
 		return -EINVAL;
 	}
 
+	if (of_property_read_bool(np, "adi,rx-on-dtx1"))
+		val |= AD242X_I2SGCTL_RXONDTX1;
+
 	if (of_property_read_bool(np, "adi,alternating-sync"))
 		val |= AD242X_I2SGCTL_ALT;
 
