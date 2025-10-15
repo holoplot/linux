@@ -125,15 +125,23 @@ static int ad242x_hw_params(struct snd_pcm_substream *substream,
 			return ret;
 	} else {
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-			if (dai->id == 0)
-				i2s_cfg |= AD242X_I2SCTL_RX0EN;
-			else
-				i2s_cfg |= AD242X_I2SCTL_RX1EN;
+			if (params_channels(params) > 16) {
+				i2s_cfg |= AD242X_I2SCTL_RX0EN | AD242X_I2SCTL_RX1EN;
+			} else {
+				if (dai->id == 0)
+					i2s_cfg |= AD242X_I2SCTL_RX0EN;
+				else
+					i2s_cfg |= AD242X_I2SCTL_RX1EN;
+			}
 		} else {
-			if (dai->id == 0)
-				i2s_cfg |= AD242X_I2SCTL_TX0EN;
-			else
-				i2s_cfg |= AD242X_I2SCTL_TX1EN;
+			if (params_channels(params) > 16) {
+				i2s_cfg |= AD242X_I2SCTL_TX0EN | AD242X_I2SCTL_TX1EN;
+			} else {
+				if (dai->id == 0)
+					i2s_cfg |= AD242X_I2SCTL_TX0EN;
+				else
+					i2s_cfg |= AD242X_I2SCTL_TX1EN;
+			}
 		}
 	}
 
