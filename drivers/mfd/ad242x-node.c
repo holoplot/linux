@@ -228,7 +228,7 @@ int ad242x_read_slot_config(struct device *dev,
 		of_property_read_u32(dn_np, "#tx-slots", &config->dn_n_tx_slots);
 		of_property_read_u32(dn_np, "#forward-slots",
 				&config->dn_n_forward_slots);
-		if (config->dn_n_tx_slots + config->dn_n_forward_slots >= 32) {
+		if (config->dn_n_tx_slots + config->dn_n_forward_slots > 32) {
 			dev_err(dev, "invalid downstream tx-slots property\n");
 			goto err_put_dn_node;
 		}
@@ -245,7 +245,7 @@ int ad242x_read_slot_config(struct device *dev,
 		of_property_read_u32(up_np, "#tx-slots", &config->up_n_tx_slots);
 		of_property_read_u32(up_np, "#forward-slots",
 				&config->up_n_forward_slots);
-		if (config->up_n_tx_slots + config->up_n_forward_slots >= 32) {
+		if (config->up_n_tx_slots + config->up_n_forward_slots > 32) {
 			dev_err(dev, "invalid downstream tx-slots property\n");
 			goto err_put_up_node;
 		}
