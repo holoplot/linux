@@ -379,7 +379,8 @@ static int ad242x_discover(struct ad242x_master *master,
 	}
 
 	if (respcycs_dn_max > respcycs_up_min) {
-		dev_err(dev, "Unsupported bus topology\n");
+		dev_err(dev, "Unsupported bus topology: dn_max (%u) > up_min (%u)\n",
+			respcycs_dn_max, respcycs_up_min);
 		return -EINVAL;
 	}
 
