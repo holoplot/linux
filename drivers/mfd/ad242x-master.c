@@ -223,6 +223,55 @@ static int ad242x_wait_for_irq(struct ad242x_master *master,
 	return ret == 0 ? -ETIMEDOUT : 0;
 }
 
+static void ad242x_dump_discovery_status(struct ad242x_master *master,
+					 unsigned int discovering_node)
+{
+	struct regmap *regmap = master->node.regmap;
+	struct device *dev = master->node.dev;
+	unsigned int inttype, intsrc, discstat, swstat;
+	int ret;
+
+	ret = regmap_read(regmap, AD242X_INTTYPE, &inttype);
+	if (ret < 0)
+		dev_err(dev, "Failed to read INTTYPE: %d\n", ret);
+	else
+		dev_err(dev, "INTTYPE=0x%02x\n", inttype);
+
+	ret = regmap_read(regmap, AD242X_INTSRC, &intsrc);
+	if (ret < 0)
+		dev_err(dev, "Failed to read INTSRC: %d\n", ret);
+	else
+		dev_err(dev, "INTSRC=0x%02x\n", intsrc);
+
+	ret = regmap_read(regmap, AD242X_DISCSTAT, &discstat);
+	if (ret < 0)
+		dev_err(dev, "Failed to read DISCSTAT: %d\n", ret);
+	else
+		dev_err(dev, "DISCSTAT=0x%02x (dnode=%u dscact=%u)\n",
+			discstat, AD242X_DISCSTAT_DNODE(discstat),
+			!!(discstat & AD242X_DISCSTAT_DSCACT));
+
+	if (discovering_node == 0)
+		ret = regmap_read(regmap, AD242X_SWSTAT, &swstat);
+	else
+		ret = ad242x_slave_read(&master->bus, regmap, discovering_node - 1,
+					 AD242X_SWSTAT, &swstat);
+
+	if (ret < 0) {
+		dev_err(dev, "Failed to read SWSTAT for upstream node %u: %d\n",
+			discovering_node == 0 ? 0 : discovering_node - 1, ret);
+		return;
+	}
+
+	dev_err(dev,
+		"SWSTAT(%s)=0x%02x (fin=%u fault=%u fault_code=%u nloc=%u)\n",
+		discovering_node == 0 ? "master" : "prev-sub",
+		swstat, !!(swstat & AD242X_SWSTAT_FIN),
+		!!(swstat & AD242X_SWSTAT_FAULT),
+		AD242X_SWSTAT_FAULTCODE(swstat),
+		!!(swstat & AD242X_SWSTAT_FAULT_NLOC));
+}
+
 static void ad242x_irq_ack(struct irq_data *data)
 {
 	printk(KERN_ERR "___ %s()\n", __func__);
@@ -404,20 +453,10 @@ static int ad242x_discover(struct ad242x_master *master,
 		ret = ad242x_wait_for_irq(master,
 					  &master->discover_completion, 50);
 		if (ret < 0) {
+			ad242x_dump_discovery_status(master, i);
 			dev_err(dev, "Discovery of node %d timed out\n", i);
 			return ret;
 		}
-
-		val = AD242X_SWCTL_MODE(2) | AD242X_SWCTL_ENSW;
-
-		if (i == 0)
-			ret = regmap_write(regmap, AD242X_SWCTL, val);
-		else
-			ret = ad242x_slave_write(&master->bus, regmap, i,
-						 AD242X_SWCTL, val);
-
-		if (ret < 0)
-			return ret;
 
 		dev_info(dev, "Node %d discovered\n", i);
 
@@ -436,8 +475,9 @@ static int ad242x_discover(struct ad242x_master *master,
 		if (ret < 0)
 			return ret;
 
+		val = AD242X_SWCTL_MODE(2) | AD242X_SWCTL_ENSW;
 		ret = ad242x_slave_write(&master->bus, regmap, i,
-					 AD242X_SWCTL, AD242X_SWCTL_ENSW);
+					 AD242X_SWCTL, val);
 		if (ret < 0)
 			return ret;
 
@@ -447,6 +487,13 @@ static int ad242x_discover(struct ad242x_master *master,
 	ret = regmap_write(regmap, AD242X_SWCTL, AD242X_SWCTL_ENSW);
 	if (ret < 0)
 		return ret;
+
+	for (i = 0; i + 1 < n; i++) {
+		ret = ad242x_slave_write(&master->bus, regmap, i,
+					 AD242X_SWCTL, AD242X_SWCTL_ENSW);
+		if (ret < 0)
+			return ret;
+	}
 
 	ret = regmap_write(regmap, AD242X_DNSLOTS, master_dn_slots);
 	if (ret < 0)
