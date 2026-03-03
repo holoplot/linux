@@ -67,6 +67,27 @@ static int ad242x_gpio_set_value(struct gpio_chip *chip,
 	return ret;
 }
 
+static int ad242x_gpio_get_direction(struct gpio_chip *chip,
+				     unsigned int gpio)
+{
+	struct ad242x_gpio *ad242x_gpio = gpiochip_get_data(chip);
+	struct regmap *regmap = ad242x_gpio->node->regmap;
+	unsigned int val;
+	int ret;
+
+	/*
+	 * GPIO-over-distance direction is controlled exclusively by
+	 * AD242X_GPIOOEN. For plain GPIOs this driver also uses GPIOOEN to
+	 * switch the line between output and non-output modes.
+	 */
+	ret = regmap_read(regmap, AD242X_GPIOOEN, &val);
+	if (ret < 0)
+		return ret;
+
+	return (val & BIT(gpio)) ? GPIO_LINE_DIRECTION_OUT :
+				   GPIO_LINE_DIRECTION_IN;
+}
+
 static int ad242x_gpio_direction_input(struct gpio_chip *chip,
 				       unsigned int gpio)
 {
@@ -350,6 +371,7 @@ static int ad242x_gpio_probe(struct platform_device *pdev)
 
 	gc = &ad242x_gpio->chip;
 	gc->request = ad242x_gpio_request;
+	gc->get_direction = ad242x_gpio_get_direction;
 	gc->direction_input = ad242x_gpio_direction_input;
 	gc->direction_output = ad242x_gpio_direction_output;
 	gc->get = ad242x_gpio_get_value;
