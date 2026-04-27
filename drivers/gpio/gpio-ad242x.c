@@ -18,7 +18,6 @@
 struct ad242x_gpio {
 	struct ad242x_node *node;
 	struct gpio_chip chip;
-	struct irq_chip irq_chip;
 	struct mutex irq_buslock;
 	u8 irq_mask, irq_inv;
 	u32 gpio_od_mask;
@@ -201,6 +200,8 @@ static void ad242x_gpio_irq_mask(struct irq_data *irq_data)
 	irq_hw_number_t hwirq = irqd_to_hwirq(irq_data);
 
 	ad242x_gpio->irq_mask |= BIT(hwirq);
+
+	gpiochip_disable_irq(gc, hwirq);
 }
 
 static void ad242x_gpio_irq_unmask(struct irq_data *irq_data)
@@ -208,6 +209,8 @@ static void ad242x_gpio_irq_unmask(struct irq_data *irq_data)
 	struct gpio_chip *gc = irq_data_get_irq_chip_data(irq_data);
 	struct ad242x_gpio *ad242x_gpio = gpiochip_get_data(gc);
 	irq_hw_number_t hwirq = irqd_to_hwirq(irq_data);
+
+	gpiochip_enable_irq(gc, hwirq);
 
 	ad242x_gpio->irq_mask &= ~BIT(hwirq);
 }
@@ -304,7 +307,7 @@ static irqreturn_t ad242x_gpio_irq_handler(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	if (!(ad242x_gpio->irq_mask & BIT(irq))) {
+	if (!(ad242x_gpio->irq_mask & BIT(index))) {
 		unsigned int virq;
 		virq = irq_find_mapping(gc->irq.domain, index);
 		handle_nested_irq(virq);
@@ -313,10 +316,20 @@ static irqreturn_t ad242x_gpio_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static const struct irq_chip ad242x_gpio_irq_chip = {
+	.name			= "ad242x-gpio",
+	.irq_mask		= ad242x_gpio_irq_mask,
+	.irq_unmask		= ad242x_gpio_irq_unmask,
+	.irq_set_type		= ad242x_gpio_set_irq_type,
+	.irq_bus_lock		= ad242x_gpio_bus_lock,
+	.irq_bus_sync_unlock	= ad242x_gpio_bus_sync_unlock,
+	.flags			= IRQCHIP_IMMUTABLE,
+	GPIOCHIP_IRQ_RESOURCE_HELPERS,
+};
+
 static int ad242x_gpio_irq_init(struct device *dev,
 				struct ad242x_gpio *ad242x_gpio)
 {
-	struct irq_chip *ic = &ad242x_gpio->irq_chip;
 	struct gpio_chip *gc = &ad242x_gpio->chip;
 	int ret, irq;
 
@@ -325,16 +338,9 @@ static int ad242x_gpio_irq_init(struct device *dev,
 
 	irq = of_irq_get(dev->of_node, 0);
 	if (irq < 0)
-		return ret;
+		return irq;
 
-	ic->name = dev_name(dev);
-	ic->irq_mask = ad242x_gpio_irq_mask;
-	ic->irq_unmask = ad242x_gpio_irq_unmask;
-	ic->irq_set_type = ad242x_gpio_set_irq_type;
-	ic->irq_bus_lock = ad242x_gpio_bus_lock,
-	ic->irq_bus_sync_unlock = ad242x_gpio_bus_sync_unlock,
-
-	gc->irq.chip = ic;
+	gpio_irq_chip_set_chip(&gc->irq, &ad242x_gpio_irq_chip);
 	gc->irq.default_type = IRQ_TYPE_NONE;
 	gc->irq.handler = handle_edge_irq;
 
@@ -344,9 +350,9 @@ static int ad242x_gpio_irq_init(struct device *dev,
 	ret = devm_request_threaded_irq(dev, irq,
 					NULL, ad242x_gpio_irq_handler,
 					IRQF_ONESHOT | IRQF_SHARED,
-					ic->name, ad242x_gpio);
+					dev_name(dev), ad242x_gpio);
 	if (ret) {
-		dev_err(dev, "failed to request irq: %d\n", irq);
+		dev_err(dev, "failed to request irq %d: %d\n", irq, ret);
 		return ret;
 	}
 
