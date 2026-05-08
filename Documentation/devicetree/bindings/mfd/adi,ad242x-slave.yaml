@@ -31,6 +31,38 @@ properties:
       - $ref: '/schemas/types.yaml#/definitions/uint32'
       - enum: [16, 32]
 
+  adi,tx0-en:
+    description: Enable the I2S TX0 data pin.
+    type: boolean
+
+  adi,tx1-en:
+    description: Enable the I2S TX1 data pin.
+    type: boolean
+
+  adi,tx2-pin-interleave:
+    description: Enable I2S TX2 pin interleaving.
+    type: boolean
+
+  adi,tx-clk-inv:
+    description: Invert the I2S TX bit clock.
+    type: boolean
+
+  adi,rx0-en:
+    description: Enable the I2S RX0 data pin.
+    type: boolean
+
+  adi,rx1-en:
+    description: Enable the I2S RX1 data pin.
+    type: boolean
+
+  adi,rx2-pin-interleave:
+    description: Enable I2S RX2 pin interleaving.
+    type: boolean
+
+  adi,rx-clk-inv:
+    description: Invert the I2S RX bit clock.
+    type: boolean
+
   adi,alternating-sync:
     description: Drives the SYNC pin for I²S operation
     type: boolean

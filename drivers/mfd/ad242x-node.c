@@ -38,6 +38,37 @@ static int ad242x_tdmmode_index(unsigned int mode, bool slave)
 	}
 }
 
+static unsigned int ad242x_i2sctl_from_dt(const struct device_node *np)
+{
+	unsigned int val = 0;
+
+	if (of_property_read_bool(np, "adi,tx0-en"))
+		val |= AD242X_I2SCTL_TX0EN;
+
+	if (of_property_read_bool(np, "adi,tx1-en"))
+		val |= AD242X_I2SCTL_TX1EN;
+
+	if (of_property_read_bool(np, "adi,tx2-pin-interleave"))
+		val |= AD242X_I2SCTL_TX2PINTL;
+
+	if (of_property_read_bool(np, "adi,tx-clk-inv"))
+		val |= AD242X_I2SCTL_TXBCLKINV;
+
+	if (of_property_read_bool(np, "adi,rx0-en"))
+		val |= AD242X_I2SCTL_RX0EN;
+
+	if (of_property_read_bool(np, "adi,rx1-en"))
+		val |= AD242X_I2SCTL_RX1EN;
+
+	if (of_property_read_bool(np, "adi,rx2-pin-interleave"))
+		val |= AD242X_I2SCTL_RX2PINTL;
+
+	if (of_property_read_bool(np, "adi,rx-clk-inv"))
+		val |= AD242X_I2SCTL_RXBCLKINV;
+
+	return val;
+}
+
 int ad242x_node_probe(struct ad242x_node *node)
 {
 	struct device_node *np = node->dev->of_node;
@@ -146,6 +177,14 @@ int ad242x_node_probe(struct ad242x_node *node)
 	ret = regmap_write(node->regmap, AD242X_I2SGCTL, val);
 	if (ret < 0)
 		return ret;
+
+	val = ad242x_i2sctl_from_dt(np);
+
+	ret = regmap_write(node->regmap, AD242X_I2SCTL, val);
+	if (ret < 0) {
+		dev_err(node->dev, "failed to write I2SCTL register %d\n", ret);
+		return ret;
+	}
 
 	return 0;
 }
