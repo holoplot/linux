@@ -191,5 +191,23 @@ config SND_SOC_J721E_EVM
 	help
 	  Say Y if you want to add support for SoC audio on j721e Common
 	  Processor Board and Infotainment expansion board.
+
+config SND_AM335X_SOC_S800
+	tristate "SoC Audio support for SUE S800 based devices"
+	depends on OF
+	depends on TI_EDMA || COMPILE_TEST
+	select SND_SOC_DAVINCI_MCASP
+	select SND_SOC_CS4271_I2C
+	select SND_SOC_CS4271_SPI
+	select SND_SOC_AK4104
+	select SND_SOC_AK5386
+	select SND_SOC_TAS5086
+	select SND_SOC_ADAU1701
+	select SND_SOC_STA350
+	select SND_SOC_SPDIF
+	help
+	  Say Y if you want to add support for SoC audio on AM335X
+	  based SUE (StreamUnlimited) S800 devices, for example
+	  Raumfeld connector 2.
 endmenu
 
