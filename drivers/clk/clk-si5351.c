@@ -1696,7 +1696,21 @@ static int si5351_i2c_probe(struct i2c_client *client)
 					ret);
 			}
 		}
+
+		/*
+		 * The mainline driver only clears CLK_POWERDOWN on prepare, so
+		 * an output not (yet) claimed via the clk framework leaves its
+		 * pin powered down even though the clock tree shows it enabled.
+		 * Power up every output here so the codec MCLK is actually
+		 * driven (SUE S800 / Raumfeld boards rely on this).
+		 */
+		si5351_set_bits(drvdata, SI5351_CLK0_CTRL + n,
+				SI5351_CLK_POWERDOWN, 0);
 	}
+
+	/* Enable fanout of MS0 and MS4 to all output multiplexers */
+	si5351_set_bits(drvdata, SI5351_FANOUT_ENABLE,
+			SI5351_MULTISYNTH_ENABLE, SI5351_MULTISYNTH_ENABLE);
 
 	ret = devm_of_clk_add_hw_provider(&client->dev, si53351_of_clk_get,
 					  drvdata);

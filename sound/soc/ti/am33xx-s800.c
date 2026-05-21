@@ -50,6 +50,7 @@ static int am33xx_s800_set_mclk(struct snd_soc_am33xx_s800 *priv)
 	unsigned int drift;
 	int sgn = priv->drift > 0 ? 1 : -1;
 	signed long comp, clk;
+	int ret;
 
 	drift = priv->drift * sgn;
 	comp = ((priv->mclk_rate_current / DATA_WORD_WIDTH) * drift) /
@@ -57,7 +58,22 @@ static int am33xx_s800_set_mclk(struct snd_soc_am33xx_s800 *priv)
 	comp *= sgn;
 	clk = priv->mclk_rate_current - comp;
 
-	return clk_set_rate(priv->mclk, clk);
+	if (clk_get_rate(priv->mclk) == clk)
+		return 0;
+
+	ret = clk_set_rate(priv->mclk, clk);
+	if (ret < 0)
+		return ret;
+
+	/*
+	 * The MCLK source (Si5351) reprograms its PLL on a rate change, which
+	 * briefly glitches MCLK while the PLL relocks. The CS4271 control port
+	 * NAKs I2C without a stable MCLK, so wait for the PLL to settle before
+	 * the codec is accessed during the rest of hw_params/trigger.
+	 */
+	msleep(10);
+
+	return 0;
 }
 
 static int snd_soc_am33xx_s800_set_control(struct snd_card *card,
