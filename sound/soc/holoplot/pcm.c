@@ -246,7 +246,8 @@ static int holoplot_pcm_probe(struct platform_device *pdev)
 		priv->dai.capture.channels_min = channels;
 		priv->dai.capture.channels_max = channels;
 		priv->dai.capture.rates = SNDRV_PCM_RATE_48000;
-		priv->dai.capture.formats = SNDRV_PCM_FMTBIT_S16_LE;
+		priv->dai.capture.formats = SNDRV_PCM_FMTBIT_S16_LE |
+					    SNDRV_PCM_FMTBIT_S32_LE;
 	}
 
 	if (!priv->dai.playback.stream_name &&
