@@ -184,10 +184,10 @@ static int ad242x_read_irqs(struct ad242x_master *master)
 
 	while (true) {
 		ret = ad242x_read_one_irq(master);
-		if (ret < 0)
-			return ret;
 		if (ret == -ENOENT)
 			return first ? ret : 0;
+		if (ret < 0)
+			return ret;
 
 		first = false;
 	}
