@@ -182,6 +182,7 @@ static void ad242x_gpio_irq_mask(struct irq_data *irq_data)
 	irq_hw_number_t hwirq = irqd_to_hwirq(irq_data);
 
 	ad242x_gpio->irq_mask |= BIT(hwirq);
+	gpiochip_disable_irq(gc, hwirq);
 }
 
 static void ad242x_gpio_irq_unmask(struct irq_data *irq_data)
@@ -190,6 +191,7 @@ static void ad242x_gpio_irq_unmask(struct irq_data *irq_data)
 	struct ad242x_gpio *ad242x_gpio = gpiochip_get_data(gc);
 	irq_hw_number_t hwirq = irqd_to_hwirq(irq_data);
 
+	gpiochip_enable_irq(gc, hwirq);
 	ad242x_gpio->irq_mask &= ~BIT(hwirq);
 }
 
@@ -233,6 +235,12 @@ static void ad242x_gpio_bus_sync_unlock(struct irq_data *irq_data)
 	u8 irq_enable = ~ad242x_gpio->irq_mask;
 	int ret;
 
+	/*
+	 * The IRQ core takes the bus lock even for operations that don't
+	 * change any state, such as disable_irq() at shutdown. Use
+	 * regmap_update_bits() throughout so that the register cache
+	 * suppresses writes for unchanged values.
+	 */
 	ret = regmap_update_bits(regmap, AD242X_GPIOOEN, irq_enable, 0);
 	if (ret < 0)
 		dev_err(dev, "Error writing GPIOOEN: %d\n", ret);
@@ -241,15 +249,16 @@ static void ad242x_gpio_bus_sync_unlock(struct irq_data *irq_data)
 	if (ret < 0)
 		dev_err(dev, "Error writing GPIOIEN: %d\n", ret);
 
-	ret = regmap_write(regmap, AD242X_PINTEN, irq_enable);
+	ret = regmap_update_bits(regmap, AD242X_PINTEN, 0xff, irq_enable);
 	if (ret < 0)
 		dev_err(dev, "Error writing IRQ mask: %d\n", ret);
 
-	ret = regmap_write(regmap, AD242X_INTMSK1, irq_enable);
+	ret = regmap_update_bits(regmap, AD242X_INTMSK1, 0xff, irq_enable);
 	if (ret < 0)
 		dev_err(dev, "Error writing IRQ mask: %d\n", ret);
 
-	ret = regmap_write(regmap, AD242X_PINTINV, ad242x_gpio->irq_inv);
+	ret = regmap_update_bits(regmap, AD242X_PINTINV, 0xff,
+				 ad242x_gpio->irq_inv);
 	if (ret < 0)
 		dev_err(dev, "Error writing IRQ inversion: %d\n", ret);
 
@@ -312,12 +321,16 @@ static int ad242x_gpio_irq_init(struct device *dev,
 	ic->irq_mask = ad242x_gpio_irq_mask;
 	ic->irq_unmask = ad242x_gpio_irq_unmask;
 	ic->irq_set_type = ad242x_gpio_set_irq_type;
-	ic->irq_bus_lock = ad242x_gpio_bus_lock,
-	ic->irq_bus_sync_unlock = ad242x_gpio_bus_sync_unlock,
+	ic->irq_bus_lock = ad242x_gpio_bus_lock;
+	ic->irq_bus_sync_unlock = ad242x_gpio_bus_sync_unlock;
+	ic->irq_request_resources = gpiochip_irq_reqres;
+	ic->irq_release_resources = gpiochip_irq_relres;
+	ic->flags = IRQCHIP_IMMUTABLE;
 
 	gc->irq.chip = ic;
 	gc->irq.default_type = IRQ_TYPE_NONE;
 	gc->irq.handler = handle_edge_irq;
+	gc->irq.threaded = true;
 
 	mutex_init(&ad242x_gpio->irq_buslock);
 	ad242x_gpio->irq_mask = 0xff;
