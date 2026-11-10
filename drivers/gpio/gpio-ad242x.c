@@ -285,7 +285,7 @@ static irqreturn_t ad242x_gpio_irq_handler(int irq, void *dev_id)
 		return IRQ_NONE;
 	}
 
-	if (!(ad242x_gpio->irq_mask & BIT(irq))) {
+	if (!(ad242x_gpio->irq_mask & BIT(index))) {
 		unsigned int virq;
 		virq = irq_find_mapping(gc->irq.domain, index);
 		handle_nested_irq(virq);
@@ -306,7 +306,7 @@ static int ad242x_gpio_irq_init(struct device *dev,
 
 	irq = of_irq_get(dev->of_node, 0);
 	if (irq < 0)
-		return ret;
+		return irq;
 
 	ic->name = dev_name(dev);
 	ic->irq_mask = ad242x_gpio_irq_mask;
