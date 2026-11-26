@@ -8,6 +8,7 @@
 #include <linux/platform_device.h>
 #include <linux/gpio/consumer.h>
 #include <linux/dma-mapping.h>
+#include <linux/io-64-nonatomic-lo-hi.h>
 
 #include <sound/core.h>
 #include <sound/initval.h>
